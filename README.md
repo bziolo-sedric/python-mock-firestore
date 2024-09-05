@@ -78,6 +78,8 @@ mock_db.collection('users').where('born', 'in', [1815, 1900]).stream()
 mock_db.collection('users').where('born', 'in', [1815, 1900]).stream()
 mock_db.collection('users').where('associates', 'array_contains', 'Charles Babbage').stream()
 mock_db.collection('users').where('associates', 'array_contains_any', ['Charles Babbage', 'Michael Faraday']).stream()
+mock_db.collection('users').where(filter=Or(filters=[('born', '==', 1815), ('born', '==', 1900)])).stream()
+mock_db.collection('users').where(filter=And(filters=[('born', '==', 1815), ('first', '==', 'Ada')])).stream()
 
 # Transforms
 mock_db.collection('users').document('alovelace').update({'likes': firestore.Increment(1)})
