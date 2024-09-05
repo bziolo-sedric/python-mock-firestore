@@ -41,8 +41,8 @@ class CollectionReference:
         timestamp = Timestamp.from_now()
         return timestamp, doc_ref
 
-    def where(self, field: str, op: str, value: Any) -> Query:
-        query = Query(self, field_filters=[(field, op, value)])
+    def where(self, field: Optional[str] = None, op: Optional[str] = None, value: Any = None, filter=None) -> Query:
+        query = Query(self, field_filters=[Query.make_field_filter(field, op, value, filter)])
         return query
 
     def order_by(self, key: str, direction: Optional[str] = None) -> Query:

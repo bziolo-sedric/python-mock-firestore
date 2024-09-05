@@ -10,6 +10,6 @@ except ImportError:
 from mockfirestore.client import MockFirestore
 from mockfirestore.document import DocumentSnapshot, DocumentReference
 from mockfirestore.collection import CollectionReference
-from mockfirestore.query import Query
+from mockfirestore.query import Query, And, Or
 from mockfirestore._helpers import Timestamp
 from mockfirestore.transaction import Transaction

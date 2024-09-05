@@ -1,6 +1,13 @@
 from unittest import TestCase
 
 from mockfirestore import MockFirestore, DocumentReference, DocumentSnapshot, AlreadyExists
+from mockfirestore.query import Or,And
+
+class MockFieldFilter:
+    def __init__(self, field_path, op_string, value=None):
+        self.field_path = field_path
+        self.op_string = op_string
+        self.value = value
 
 
 class TestCollectionReference(TestCase):
@@ -192,6 +199,79 @@ class TestCollectionReference(TestCase):
         self.assertEqual(len(contains_any_docs), 2)
         self.assertEqual({'field': ['val4']}, contains_any_docs[0].to_dict())
         self.assertEqual({'field': ['val3', 'val2', 'val1']}, contains_any_docs[1].to_dict())
+
+    def test_collection_whereNone(self):
+        fs = MockFirestore()
+        fs._data = {'foo': {
+            'first': {'a': 'A'},
+            'second': {'a': None},
+            'third': {'a': 'B'}
+        }}
+
+        contains_none_docs = list(fs.collection('foo').where('a', '==', None).stream())
+        self.assertEqual(len(contains_none_docs), 1)
+        self.assertEqual(contains_none_docs[0].id, 'second')
+
+    def test_collection_nestedWhereFieldFilter(self):
+        fs = MockFirestore()
+        fs._data = {'foo': {
+            'first': {'a': 3},
+            'second': {'a': 4},
+            'third': {'a': 5}
+        }}
+
+        filters = [MockFieldFilter('a', '>=', 4),
+                   MockFieldFilter('a', '>=', 5)]
+        ge_4_dicts = [d.to_dict()
+                      for d in list(fs.collection('foo').where(
+                              filter=filters[0]).stream())
+                      ]
+        ge_5_dicts = [d.to_dict()
+                      for d in list(fs.collection('foo').where(
+                              filter=filters[0]).where(
+                                  filter=filters[1]).stream())
+                      ]
+        self.assertEqual(len(ge_4_dicts), 2)
+        self.assertEqual(sorted([o['a'] for o in ge_4_dicts]), [4, 5])
+        self.assertEqual(len(ge_5_dicts), 1)
+        self.assertEqual([o['a'] for o in ge_5_dicts], [5])
+
+    def test_collection_compoundAndFilter(self):
+        fs = MockFirestore()
+        fs._data = {'foo': {
+            'first': {'a': 3, 'b': 0},
+            'second': {'a': 4, 'b': 1},
+            'third': {'a': 5, 'b': 1}
+        }}
+
+        filter= And(filters=[
+                MockFieldFilter('a', '==', 4),
+                MockFieldFilter('b', '==', 1),
+                ])
+        eq_41_dicts = [d.to_dict() for d in list(fs.collection('foo').where(
+            filter=filter).stream())]
+
+        self.assertEqual(len(eq_41_dicts), 1)
+        self.assertEqual(eq_41_dicts[0]['a'], 4)
+        self.assertEqual(eq_41_dicts[0]['b'], 1)
+
+    def test_collection_compoundOrFilter(self):
+        fs = MockFirestore()
+        fs._data = {'foo': {
+            'first': {'a': 3},
+            'second': {'a': 4},
+            'third': {'a': 5}
+        }}
+
+        filter= Or(filters=[
+                MockFieldFilter('a', '==', 4),
+                MockFieldFilter('a', '==', 5),
+                ])
+        eq_45_dicts = [d.to_dict() for d in list(fs.collection('foo').where(
+            filter=filter).stream())]
+
+        self.assertEqual(len(eq_45_dicts), 2)
+
 
     def test_collection_orderBy(self):
         fs = MockFirestore()

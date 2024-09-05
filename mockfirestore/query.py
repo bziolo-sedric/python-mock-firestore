@@ -5,6 +5,28 @@ from typing import Iterator, Any, Optional, List, Callable, Union
 from mockfirestore.document import DocumentSnapshot
 from mockfirestore._helpers import T
 
+class StructuredQuery():
+    class UnaryFilter():
+        class Operator():
+            OPERATOR_UNSPECIFIED = 0
+            IS_NAN = 2
+            IS_NULL = 3
+            IS_NOT_NAN = 4
+            IS_NOT_NULL = 5
+
+
+class CompositeFilter():
+    def __init__(self, filters: List[Any]):
+        self.filters = filters
+
+
+class Or(CompositeFilter):
+    pass
+
+
+class And(CompositeFilter):
+    pass
+
 
 class Query:
     def __init__(self, parent: 'CollectionReference', projection=None,
@@ -24,12 +46,43 @@ class Query:
             for field_filter in field_filters:
                 self._add_field_filter(*field_filter)
 
-    def stream(self, transaction=None) -> Iterator[DocumentSnapshot]:
+    def stream(self, transaction=None):
+
         doc_snapshots = self.parent.stream()
 
         for field, compare, value in self._field_filters:
-            doc_snapshots = [doc_snapshot for doc_snapshot in doc_snapshots
-                             if compare(doc_snapshot._get_by_field_path(field), value)]
+            filtered_snapshots = []
+
+            # Handle fieldpath.documentId()
+            if field == '__name__':
+                for doc_snapshot in doc_snapshots:
+                    if compare(doc_snapshot.id, value):
+                        filtered_snapshots.append(doc_snapshot)
+                doc_snapshots = filtered_snapshots
+                continue
+
+            for doc_snapshot in doc_snapshots:
+                # Field path can be None if literval value is None
+                field_path = doc_snapshot._get_by_field_path(field)
+
+                if field in ['Or', 'And']:
+                    # Evaluate all field filters
+                    results = []
+
+                    for (f, op, v) in value:
+                        compound_compare = self._compare_func(op)
+                        results.append(
+                            compound_compare(
+                                doc_snapshot._get_by_field_path(f), v)
+                        )
+
+                    if compare(results):
+                        filtered_snapshots.append(doc_snapshot)
+                else:
+                    if compare(field_path, value):
+                        filtered_snapshots.append(doc_snapshot)
+
+            doc_snapshots = filtered_snapshots
 
         if self.orders:
             for key, direction in self.orders:
@@ -38,11 +91,13 @@ class Query:
                                        reverse=direction == 'DESCENDING')
         if self._start_at:
             document_fields_or_snapshot, before = self._start_at
-            doc_snapshots = self._apply_cursor(document_fields_or_snapshot, doc_snapshots, before, True)
+            doc_snapshots = self._apply_cursor(
+                document_fields_or_snapshot, doc_snapshots, before, True)
 
         if self._end_at:
             document_fields_or_snapshot, before = self._end_at
-            doc_snapshots = self._apply_cursor(document_fields_or_snapshot, doc_snapshots, before, False)
+            doc_snapshots = self._apply_cursor(
+                document_fields_or_snapshot, doc_snapshots, before, False)
 
         if self._offset:
             doc_snapshots = islice(doc_snapshots, self._offset, None)
@@ -61,9 +116,26 @@ class Query:
         compare = self._compare_func(op)
         self._field_filters.append((field, compare, value))
 
-    def where(self, field: str, op: str, value: Any) -> 'Query':
+    def where(self, field: Optional[str] = None, op: Optional[str] = None, value: Any = None, filter=None) -> 'PatchedQuery':
+        field, op, value = self.make_field_filter(field, op, value, filter)
         self._add_field_filter(field, op, value)
         return self
+
+    @staticmethod
+    def make_field_filter(field: Optional[str], op: Optional[str], value: Any = None, filter=None):
+        if bool(filter) and (bool(field) or bool(op)):
+            raise ValueError(
+                "Can't pass in both the positional arguments and 'filter' at the same time")
+        if filter:
+            if isinstance(filter, CompositeFilter):
+                filters = [Query.make_field_filter(
+                    None, None, None, f) for f in filter.filters]
+                return (filter.__class__.__name__, filter.__class__.__name__, filters)
+
+            return (filter.field_path, filter.op_string, filter.value)
+
+        else:
+            return (field, op, value)
 
     def order_by(self, key: str, direction: Optional[str] = 'ASCENDING') -> 'Query':
         self.orders.append((key, direction))
@@ -137,3 +209,9 @@ class Query:
             return lambda x, y: y in x
         elif op == 'array_contains_any':
             return lambda x, y: any([val in y for val in x])
+        elif op == 'Or':
+            return any
+        elif op == 'And':
+            return all
+        elif op == StructuredQuery.UnaryFilter.Operator.IS_NULL:
+            return lambda x, y: x is None
