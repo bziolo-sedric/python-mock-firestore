@@ -127,7 +127,7 @@ class Query:
             raise ValueError(
                 "Can't pass in both the positional arguments and 'filter' at the same time")
         if filter:
-            if isinstance(filter, CompositeFilter):
+            if hasattr(filter, 'filters'):
                 filters = [Query.make_field_filter(
                     None, None, None, f) for f in filter.filters]
                 return (filter.__class__.__name__, filter.__class__.__name__, filters)
