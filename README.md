@@ -4,7 +4,7 @@ An in-memory implementation of the [Python client library](https://github.com/go
 
 To install:
 
-`pip install mock-firestore`
+`pip install mock-firestore-plus`
 
 Python 3.6+ is required for it to work.
 
