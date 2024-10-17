@@ -26,8 +26,21 @@ def get_by_path(data: Dict[str, T], path: Sequence[str], create_nested: bool = F
         return reduce(operator.getitem, path, data)
 
 
+def _normalize_nested(value):
+    """Iterate a nested object, and handle initial transformations e.g Increment"""
+    if isinstance(value, dict):
+        return {k: _normalize_nested(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [_normalize_nested(v) for v in value]
+    elif hasattr(value, 'value'):
+        return value.value
+    else:
+        return value
+
+
 def set_by_path(data: Dict[str, T], path: Sequence[str], value: T, create_nested: bool = True):
     """Set a value in a nested object in root by item sequence."""
+    value = _normalize_nested(value)
     get_by_path(data, path[:-1], create_nested=True)[path[-1]] = value
 
 

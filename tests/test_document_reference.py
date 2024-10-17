@@ -23,7 +23,17 @@ class TestDocumentReference(TestCase):
         fs.document('foo/doc1/bar/doc2').set(doc_content)
         doc = fs.document('foo/doc1/bar/doc2').get().to_dict()
         self.assertEqual(doc_content, doc)
-        
+
+    def test_set_document_with_increment(self):
+        fs = MockFirestore()
+        fs._data = {}
+        doc_content = {'count': firestore.Increment(2)}
+        fs.document('foo/doc2').set(doc_content, merge=True)
+        doc = fs.document('foo/doc2').get().to_dict()
+        self.assertEqual(doc, {
+            'count': 2
+        })
+
     def test_document_get_returnsDocument(self):
         fs = MockFirestore()
         fs._data = {'foo': {
