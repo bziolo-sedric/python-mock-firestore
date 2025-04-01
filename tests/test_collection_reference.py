@@ -272,6 +272,79 @@ class TestCollectionReference(TestCase):
 
         self.assertEqual(len(eq_45_dicts), 2)
 
+    def test_collection_nestedCompoundFilters(self):
+        fs = MockFirestore()
+        fs._data = {'foo': {
+            'first': {'a': 3, 'b': 1, 'c': 10},
+            'second': {'a': 4, 'b': 2, 'c': 20},
+            'third': {'a': 5, 'b': 3, 'c': 30},
+            'fourth': {'a': 4, 'b': 3, 'c': 40},
+            'fifth': {'a': 5, 'b': 2, 'c': 50}
+        }}
+
+        # Test nested Or inside And
+        nested_filter = And(filters=[
+            MockFieldFilter('b', '>', 1),
+            Or(filters=[
+                MockFieldFilter('a', '==', 4),
+                MockFieldFilter('a', '==', 5)
+            ])
+        ])
+        
+        results = [d.to_dict() for d in list(fs.collection('foo').where(
+            filter=nested_filter).stream())]
+        
+        # Should match second, third, fourth, and fifth documents
+        self.assertEqual(len(results), 4)
+        c_values = sorted([doc['c'] for doc in results])
+        self.assertEqual(c_values, [20, 30, 40, 50])
+        
+        # Test nested And inside Or
+        nested_filter2 = Or(filters=[
+            And(filters=[
+                MockFieldFilter('a', '==', 4),
+                MockFieldFilter('b', '==', 2)
+            ]),
+            And(filters=[
+                MockFieldFilter('a', '==', 5),
+                MockFieldFilter('b', '==', 3)
+            ])
+        ])
+        
+        results2 = [d.to_dict() for d in list(fs.collection('foo').where(
+            filter=nested_filter2).stream())]
+        
+        # Should match second and third documents
+        self.assertEqual(len(results2), 2)
+        c_values2 = sorted([doc['c'] for doc in results2])
+        self.assertEqual(c_values2, [20, 30])
+        
+        # Test flattened version of the previously deeply nested filters
+        # Instead of 3 levels, we'll use 2 levels with equivalent logic
+        flattened_filter = Or(filters=[
+            And(filters=[
+                MockFieldFilter('b', '==', 1),
+                MockFieldFilter('c', '==', 10)
+            ]),
+            And(filters=[
+                MockFieldFilter('b', '>', 1),
+                MockFieldFilter('b', '<', 3)  # This will exclude 'third' and 'fourth' with b=3
+            ]),
+            MockFieldFilter('a', '==', 4),
+            And(filters=[
+                MockFieldFilter('a', '==', 5),
+                MockFieldFilter('c', '>', 40)
+            ])
+        ])
+        
+        results3 = [d.to_dict() for d in list(fs.collection('foo').where(
+            filter=flattened_filter).stream())]
+        
+        # Should match first, second, fourth, and fifth documents
+        self.assertEqual(len(results3), 4)
+        c_values3 = sorted([doc['c'] for doc in results3])
+        self.assertEqual(c_values3, [10, 20, 40, 50])
+
 
     def test_collection_orderBy(self):
         fs = MockFirestore()

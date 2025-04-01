@@ -62,23 +62,35 @@ class Query:
                 continue
 
             for doc_snapshot in doc_snapshots:
-                # Field path can be None if literval value is None
-                field_path = doc_snapshot._get_by_field_path(field)
-
-                if field in ['Or', 'And']:
-                    # Evaluate all field filters
+                if field in ["Or", "And"]:
+                    # Evaluate composite filters
                     results = []
-
-                    for (f, op, v) in value:
-                        compound_compare = self._compare_func(op)
-                        results.append(
-                            compound_compare(
-                                doc_snapshot._get_by_field_path(f), v)
-                        )
-
+                    
+                    for filter_group in value:
+                        # Handle nested And/Or within Or/And
+                        if isinstance(filter_group, tuple) and filter_group[0] in ["And", "Or"]:
+                            nested_compare = self._compare_func(filter_group[0])
+                            nested_results = []
+                            
+                            for nested_filter in filter_group[2]:
+                                f, op, v = nested_filter
+                                nested_field_path = doc_snapshot._get_by_field_path(f)
+                                nested_field_compare = self._compare_func(op)
+                                nested_results.append(nested_field_compare(nested_field_path, v))
+                            
+                            results.append(nested_compare(nested_results))
+                        else:
+                            # Handle regular field filters inside composite
+                            f, op, v = filter_group
+                            field_path = doc_snapshot._get_by_field_path(f)
+                            field_compare = self._compare_func(op)
+                            results.append(field_compare(field_path, v))
+                    
                     if compare(results):
                         filtered_snapshots.append(doc_snapshot)
                 else:
+                    # Regular field filter
+                    field_path = doc_snapshot._get_by_field_path(field)
                     if compare(field_path, value):
                         filtered_snapshots.append(doc_snapshot)
 
@@ -210,8 +222,8 @@ class Query:
         elif op == 'array_contains_any':
             return lambda x, y: any([val in y for val in x])
         elif op == 'Or':
-            return any
+            return lambda x: any(x)
         elif op == 'And':
-            return all
+            return lambda x: all(x)
         elif op == StructuredQuery.UnaryFilter.Operator.IS_NULL:
             return lambda x, y: x is None
