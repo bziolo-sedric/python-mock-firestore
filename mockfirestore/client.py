@@ -1,5 +1,5 @@
 from typing import Iterable, Sequence
-from mockfirestore.collection import CollectionReference
+from mockfirestore.collection import CollectionReference, CollectionGroup
 from mockfirestore.document import DocumentReference, DocumentSnapshot
 from mockfirestore.transaction import Transaction
 
@@ -25,8 +25,8 @@ class MockFirestore:
 
         if len(path) % 2 != 0:
             raise Exception("Cannot create document at path {}".format(path))
+        
         current_position = self._ensure_path(path)
-
         return current_position.document(path[-1])
 
     def collection(self, path: str) -> CollectionReference:
@@ -34,8 +34,9 @@ class MockFirestore:
 
         if len(path) % 2 != 1:
             raise Exception("Cannot create collection at path {}".format(path))
-
+        
         name = path[-1]
+
         if len(path) > 1:
             current_position = self._ensure_path(path)
             return current_position.collection(name)
@@ -47,16 +48,20 @@ class MockFirestore:
     def collections(self) -> Sequence[CollectionReference]:
         return [CollectionReference(self._data, [collection_name]) for collection_name in self._data]
 
+    def collection_group(self, collection_id: str) -> "CollectionGroup":
+        return CollectionGroup(self._data, collection_id)
+
     def reset(self):
         self._data = {}
 
-    def get_all(self, references: Iterable[DocumentReference],
-                field_paths=None,
-                transaction=None) -> Iterable[DocumentSnapshot]:
+    def get_all(
+        self,
+        references: Iterable[DocumentReference],
+        field_paths=None,
+        transaction=None
+    ) -> Iterable[DocumentSnapshot]:
         for doc_ref in set(references):
             yield doc_ref.get()
 
     def transaction(self, **kwargs) -> Transaction:
         return Transaction(self, **kwargs)
-
-

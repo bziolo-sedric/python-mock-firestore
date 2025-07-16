@@ -83,3 +83,151 @@ class CollectionReference:
         for key in sorted(get_by_path(self._data, self._path)):
             doc_snapshot = self.document(key).get()
             yield doc_snapshot
+
+class CollectionGroup:
+    def __init__(
+        self,
+        data: Store,
+        collection_id: str,
+        projection=None,
+        field_filters=(),
+        orders=(),
+        limit=None,
+        limit_to_last=False,
+        offset=None,
+        start_at=None,
+        end_at=None,
+        all_descendants=True,
+        recursive=False,
+    ):
+        self._data = data
+        self._collection_id = collection_id
+        self._projection = projection
+        self._field_filters = field_filters
+        self._orders = orders
+        self._limit = limit
+        self._limit_to_last = limit_to_last
+        self._offset = offset
+        self._start_at = start_at
+        self._end_at = end_at
+        self._all_descendants = all_descendants
+        self._recursive = recursive
+
+    def _find_collections(self, node, path):
+        """Recursively find all subcollections matching collection_id."""
+        found = []
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if isinstance(value, dict) and not key.startswith("_"):
+                    if key == self._collection_id:
+                        found.append((value, path + [key]))
+                    for doc_key, doc_value in value.items():
+                        if isinstance(doc_value, dict):
+                            found += self._find_collections(doc_value, path + [key, doc_key])
+        return found
+
+    def _copy(self, **kwargs):
+        args = dict(
+            data=self._data,
+            collection_id=self._collection_id,
+            projection=self._projection,
+            field_filters=self._field_filters,
+            orders=self._orders,
+            limit=self._limit,
+            limit_to_last=self._limit_to_last,
+            offset=self._offset,
+            start_at=self._start_at,
+            end_at=self._end_at,
+            all_descendants=self._all_descendants,
+            recursive=self._recursive,
+        )
+        args.update(kwargs)
+        return CollectionGroup(**args)
+
+    # ---- Query/Chaining methods ----
+    def where(self, field=None, op=None, value=None, filter=None):
+        new_filters = self._field_filters + (Query.make_field_filter(field, op, value, filter),)
+        return self._copy(field_filters=new_filters)
+
+    def order_by(self, key, direction=None):
+        new_orders = self._orders + ((key, direction),)
+        return self._copy(orders=new_orders)
+
+    def limit(self, limit_amount):
+        return self._copy(limit=limit_amount)
+
+    def limit_to_last(self, limit_amount):
+        return self._copy(limit=limit_amount, limit_to_last=True)
+
+    def offset(self, offset):
+        return self._copy(offset=offset)
+
+    def start_at(self, document_fields_or_snapshot):
+        return self._copy(start_at=(document_fields_or_snapshot, True))
+
+    def start_after(self, document_fields_or_snapshot):
+        return self._copy(start_at=(document_fields_or_snapshot, False))
+
+    def end_at(self, document_fields_or_snapshot):
+        return self._copy(end_at=(document_fields_or_snapshot, True))
+
+    def end_before(self, document_fields_or_snapshot):
+        return self._copy(end_at=(document_fields_or_snapshot, False))
+
+    # ---- Aggregations (stubs for API compatibility) ----
+    def count(self, alias=None):
+        # Stub: return self or a fake AggregationQuery mock
+        return self
+
+    def avg(self, field_ref, alias=None):
+        return self
+
+    def sum(self, field_ref, alias=None):
+        return self
+
+    # ---- Vector/Similarity (stub) ----
+    def find_nearest(
+        self,
+        vector_field,
+        query_vector,
+        limit,
+        distance_measure,
+        *,
+        distance_result_field=None,
+        distance_threshold=None
+    ):
+        return self
+
+    # ---- Streaming/get ----
+    def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+        docs = list(self._iter_documents())
+        for doc in docs:
+            yield doc
+
+    def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+        return list(self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options))
+
+    def list_documents(self, page_size=None):
+        docs = []
+        collections = self._find_collections(self._data, [])
+        for collection, path in collections:
+            for doc_id in collection:
+                docs.append(DocumentReference(self._data, path + [doc_id]))
+        return docs
+
+    def on_snapshot(self, callback):
+        raise NotImplementedError("on_snapshot is not supported in mock.")
+
+    # ---- Internal: yield DocumentSnapshot objects, filtered ----
+    def _iter_documents(self):
+        collections = self._find_collections(self._data, [])
+        docs = []
+        for collection, path in collections:
+            for doc_id in collection:
+                doc_ref = DocumentReference(self._data, path + [doc_id])
+                docs.append(doc_ref.get())
+        # Here is where you'd apply field filters, order_by, limit, offset, etc.
+        return docs
+
+    def __repr__(self):
+        return f"<CollectionGroup '{self._collection_id}'>"
