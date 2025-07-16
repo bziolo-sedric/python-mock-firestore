@@ -53,16 +53,20 @@ class DocumentSnapshot:
 
 
 class DocumentReference:
-    def __init__(self, data: Store, path: List[str],
-                 parent: 'CollectionReference') -> None:
+    def __init__(
+        self, 
+        data: Store, 
+        path: List[str],
+        parent: 'CollectionReference'
+    ) -> None:
         self._data = data
         self._path = path
         self.parent = parent
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(tuple(self._path))
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
 
@@ -84,7 +88,7 @@ class DocumentReference:
     def delete(self):
         delete_by_path(self._data, self._path)
 
-    def set(self, data: Dict, merge=False):
+    def set(self, data: Dict, merge: bool = False):
         if merge:
             try:
                 self.update(deepcopy(data))
@@ -100,10 +104,18 @@ class DocumentReference:
 
         apply_transformations(document, deepcopy(data))
 
-    def collection(self, name) -> 'CollectionReference':
+    def collection(self, name: str) -> 'CollectionReference':
         from mockfirestore.collection import CollectionReference
         document = get_by_path(self._data, self._path)
         new_path = self._path + [name]
         if name not in document:
             set_by_path(self._data, new_path, {})
         return CollectionReference(self._data, new_path, parent=self)
+
+    def create(
+        self,
+        document_data: Dict[str, Any],
+        retry: Optional[Any] = None,
+        timeout: Optional[float] = None,
+    ):
+        self.set(data=document_data, merge=False)
