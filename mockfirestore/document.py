@@ -111,3 +111,11 @@ class DocumentReference:
         if name not in document:
             set_by_path(self._data, new_path, {})
         return CollectionReference(self._data, new_path, parent=self)
+
+    def create(
+        self,
+        document_data: Dict[str, Any],
+        retry: Any = None,
+        timeout: float | None = None,
+    ):
+        self.set(data=document_data, merge=False)
