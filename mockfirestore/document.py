@@ -115,7 +115,7 @@ class DocumentReference:
     def create(
         self,
         document_data: Dict[str, Any],
-        retry: Any = None,
-        timeout: float | None = None,
+        retry: Optional[Any] = None,
+        timeout: Optional[float] = None,
     ):
         self.set(data=document_data, merge=False)
