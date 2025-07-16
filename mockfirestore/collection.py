@@ -113,17 +113,24 @@ class CollectionGroup:
         self._all_descendants = all_descendants
         self._recursive = recursive
 
-    def _find_collections(self, node, path):
-        """Recursively find all subcollections matching collection_id."""
+    def _find_collections(self, node, path, parent_docref=None):
+        """
+        Recursively find all subcollections matching collection_id.
+        Returns list of (collection_dict, path, parent_docref)
+        """
         found = []
         if isinstance(node, dict):
             for key, value in node.items():
                 if isinstance(value, dict) and not key.startswith("_"):
                     if key == self._collection_id:
-                        found.append((value, path + [key]))
+                        found.append((value, path + [key], parent_docref))
                     for doc_key, doc_value in value.items():
                         if isinstance(doc_value, dict):
-                            found += self._find_collections(doc_value, path + [key, doc_key])
+                            # Prepare the DocumentReference for this document as parent
+                            doc_path = path + [key, doc_key]
+                            docref_parent = CollectionReference(self._data, path + [key], parent=parent_docref)
+                            docref = DocumentReference(self._data, doc_path, parent=docref_parent)
+                            found += self._find_collections(doc_value, doc_path, parent_docref=docref)
         return found
 
     def _copy(self, **kwargs):
@@ -176,7 +183,6 @@ class CollectionGroup:
 
     # ---- Aggregations (stubs for API compatibility) ----
     def count(self, alias=None):
-        # Stub: return self or a fake AggregationQuery mock
         return self
 
     def avg(self, field_ref, alias=None):
@@ -185,7 +191,6 @@ class CollectionGroup:
     def sum(self, field_ref, alias=None):
         return self
 
-    # ---- Vector/Similarity (stub) ----
     def find_nearest(
         self,
         vector_field,
@@ -209,10 +214,11 @@ class CollectionGroup:
 
     def list_documents(self, page_size=None):
         docs = []
-        collections = self._find_collections(self._data, [])
-        for collection, path in collections:
+        collections = self._find_collections(self._data, [], parent_docref=None)
+        for collection, path, parent_docref in collections:
+            collection_ref = CollectionReference(self._data, path, parent=parent_docref)
             for doc_id in collection:
-                docs.append(DocumentReference(self._data, path + [doc_id]))
+                docs.append(DocumentReference(self._data, path + [doc_id], parent=collection_ref))
         return docs
 
     def on_snapshot(self, callback):
@@ -220,13 +226,14 @@ class CollectionGroup:
 
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
     def _iter_documents(self):
-        collections = self._find_collections(self._data, [])
+        collections = self._find_collections(self._data, [], parent_docref=None)
         docs = []
-        for collection, path in collections:
+        for collection, path, parent_docref in collections:
+            collection_ref = CollectionReference(self._data, path, parent=parent_docref)
             for doc_id in collection:
-                doc_ref = DocumentReference(self._data, path + [doc_id])
+                doc_ref = DocumentReference(self._data, path + [doc_id], parent=collection_ref)
                 docs.append(doc_ref.get())
-        # Here is where you'd apply field filters, order_by, limit, offset, etc.
+        # Filtering, ordering, etc would go here.
         return docs
 
     def __repr__(self):
