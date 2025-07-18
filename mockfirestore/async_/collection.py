@@ -40,18 +40,21 @@ class AsyncCollectionReference:
             set_by_path(self._data, new_path, {})
         return AsyncDocumentReference(self._data, new_path, parent=self)
 
-    async def get(self) -> Iterable[AsyncDocumentSnapshot]:
+    async def get(self) -> List[AsyncDocumentSnapshot]:
         """Get all documents in the collection.
 
         Returns:
-            An iterable of AsyncDocumentSnapshot objects.
+            A list of AsyncDocumentSnapshot objects.
 
         Deprecated:
             Use AsyncCollectionReference.stream instead.
         """
         warnings.warn('Collection.get is deprecated, please use Collection.stream',
                       category=DeprecationWarning)
-        return await self.stream()
+        results = []
+        async for doc in self.stream():
+            results.append(doc)
+        return results
 
     async def add(self, document_data: Dict, document_id: str = None) \
             -> Tuple[Timestamp, AsyncDocumentReference]:
@@ -192,7 +195,7 @@ class AsyncCollectionReference:
             docs.append(self.document(key))
         return docs
 
-    async def stream(self, transaction=None) -> Iterable[AsyncDocumentSnapshot]:
+    async def stream(self, transaction=None):
         """Stream the documents in the collection.
 
         Args:
@@ -200,13 +203,11 @@ class AsyncCollectionReference:
                 this transaction.
 
         Returns:
-            An iterable of AsyncDocumentSnapshot objects.
+            An asynchronous iterator of AsyncDocumentSnapshot objects.
         """
-        snapshots = []
         for key in sorted(get_by_path(self._data, self._path)):
             doc_snapshot = await self.document(key).get()
-            snapshots.append(doc_snapshot)
-        return snapshots
+            yield doc_snapshot
 
 
 class AsyncCollectionGroup:
@@ -456,10 +457,14 @@ class AsyncCollectionGroup:
             explain_options: Query explanation options.
 
         Returns:
-            An iterable of AsyncDocumentSnapshot objects.
+            An asynchronous iterator of AsyncDocumentSnapshot objects.
         """
-        docs = await self._iter_documents()
-        return docs
+        collections = self._find_collections(self._data, [], parent_docref=None)
+        for collection, path, parent_docref in collections:
+            collection_ref = AsyncCollectionReference(self._data, path, parent=parent_docref)
+            for doc_id in collection:
+                doc_ref = AsyncDocumentReference(self._data, path + [doc_id], parent=collection_ref)
+                yield await doc_ref.get()
 
     async def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
         """Get all documents in the collection group.
@@ -473,7 +478,10 @@ class AsyncCollectionGroup:
         Returns:
             A list of AsyncDocumentSnapshot objects.
         """
-        return await self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options)
+        results = []
+        async for doc in self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options):
+            results.append(doc)
+        return results
 
     async def list_documents(self, page_size=None):
         """List all document references in the collection group.
@@ -506,19 +514,16 @@ class AsyncCollectionGroup:
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
     async def _iter_documents(self):
         """Iterate through all documents in the collection group.
+        
+        This method is deprecated. Use stream() instead.
 
         Returns:
             A list of AsyncDocumentSnapshot objects.
         """
-        collections = self._find_collections(self._data, [], parent_docref=None)
-        docs = []
-        for collection, path, parent_docref in collections:
-            collection_ref = AsyncCollectionReference(self._data, path, parent=parent_docref)
-            for doc_id in collection:
-                doc_ref = AsyncDocumentReference(self._data, path + [doc_id], parent=collection_ref)
-                docs.append(await doc_ref.get())
-        # Filtering, ordering, etc would go here.
-        return docs
+        results = []
+        async for doc in self.stream():
+            results.append(doc)
+        return results
 
     def __repr__(self):
         return f"<AsyncCollectionGroup '{self._collection_id}'>"

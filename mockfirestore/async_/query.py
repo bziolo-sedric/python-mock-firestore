@@ -209,7 +209,10 @@ class AsyncQuery:
         Returns:
             A list of AsyncDocumentSnapshot objects.
         """
-        return await self.stream(transaction=transaction)
+        results = []
+        async for doc in self.stream(transaction=transaction):
+            results.append(doc)
+        return results
 
     async def stream(self, transaction=None):
         """Stream the documents matching the query.
@@ -219,7 +222,7 @@ class AsyncQuery:
                 this transaction.
                 
         Returns:
-            An iterable of AsyncDocumentSnapshot objects.
+            An asynchronous iterator of AsyncDocumentSnapshot objects.
         """
         from mockfirestore.async_.document import AsyncDocumentSnapshot
         
@@ -240,14 +243,11 @@ class AsyncQuery:
         if self._limit:
             ordered_doc_ids = ordered_doc_ids[:self._limit]
         
-        # Prepare snapshots
-        results = []
+        # Yield snapshots one by one
         for doc_id in ordered_doc_ids:
             doc_ref = self._parent.document(doc_id)
             doc_snapshot = await doc_ref.get()
-            results.append(doc_snapshot)
-            
-        return results
+            yield doc_snapshot
 
     def _passes_filters(self, doc_data):
         """Check if a document passes all filters.
