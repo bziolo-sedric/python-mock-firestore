@@ -88,14 +88,14 @@ class DocumentReference:
     def delete(self):
         delete_by_path(self._data, self._path)
 
-    def set(self, data: Dict, merge: bool = False):
+    def set(self, document_data: Dict, merge: bool = False):
         if merge:
             try:
-                self.update(deepcopy(data))
+                self.update(deepcopy(document_data))
             except NotFound:
-                self.set(data)
+                self.set(document_data)
         else:
-            set_by_path(self._data, self._path, deepcopy(data))
+            set_by_path(self._data, self._path, deepcopy(document_data))
 
     def update(self, data: Dict[str, Any]):
         document = get_by_path(self._data, self._path)
@@ -118,4 +118,4 @@ class DocumentReference:
         retry: Optional[Any] = None,
         timeout: Optional[float] = None,
     ):
-        self.set(data=document_data, merge=False)
+        self.set(document_data=document_data, merge=False)
