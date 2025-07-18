@@ -45,16 +45,16 @@ class CollectionReference:
         query = Query(self, field_filters=[Query.make_field_filter(field, op, value, filter)])
         return query
 
-    def order_by(self, key: str, direction: Optional[str] = None) -> Query:
-        query = Query(self, orders=[(key, direction)])
+    def order_by(self, field_path: str, direction: Optional[str] = None) -> Query:
+        query = Query(self, orders=[(field_path, direction)])
         return query
 
-    def limit(self, limit_amount: int) -> Query:
-        query = Query(self, limit=limit_amount)
+    def limit(self, count: int) -> Query:
+        query = Query(self, limit=count)
         return query
 
-    def offset(self, offset: int) -> Query:
-        query = Query(self, offset=offset)
+    def offset(self, num_to_skip: int) -> Query:
+        query = Query(self, offset=num_to_skip)
         return query
 
     def start_at(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot]) -> Query:
@@ -156,18 +156,18 @@ class CollectionGroup:
         new_filters = self._field_filters + (Query.make_field_filter(field, op, value, filter),)
         return self._copy(field_filters=new_filters)
 
-    def order_by(self, key, direction=None):
-        new_orders = self._orders + ((key, direction),)
+    def order_by(self, field_path: str, direction: Optional[str] = None):
+        new_orders = self._orders + ((field_path, direction),)
         return self._copy(orders=new_orders)
 
-    def limit(self, limit_amount):
-        return self._copy(limit=limit_amount)
+    def limit(self, count: int):
+        return self._copy(limit=count)
 
-    def limit_to_last(self, limit_amount):
-        return self._copy(limit=limit_amount, limit_to_last=True)
+    def limit_to_last(self, count: int):
+        return self._copy(limit=count, limit_to_last=True)
 
-    def offset(self, offset):
-        return self._copy(offset=offset)
+    def offset(self, num_to_skip: int):
+        return self._copy(offset=num_to_skip)
 
     def start_at(self, document_fields_or_snapshot):
         return self._copy(start_at=(document_fields_or_snapshot, True))
@@ -180,6 +180,9 @@ class CollectionGroup:
 
     def end_before(self, document_fields_or_snapshot):
         return self._copy(end_at=(document_fields_or_snapshot, False))
+    
+    def select(self, field_paths: Iterable[str]):
+        return self._copy(projection=field_paths)
 
     # ---- Aggregations (stubs for API compatibility) ----
     def count(self, alias=None):
