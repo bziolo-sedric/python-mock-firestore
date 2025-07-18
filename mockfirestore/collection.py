@@ -23,10 +23,10 @@ class CollectionReference:
             set_by_path(self._data, new_path, {})
         return DocumentReference(self._data, new_path, parent=self)
 
-    def get(self) -> Iterable[DocumentSnapshot]:
+    def get(self) -> List[DocumentSnapshot]:
         warnings.warn('Collection.get is deprecated, please use Collection.stream',
                       category=DeprecationWarning)
-        return self.stream()
+        return list(self.stream())
 
     def add(self, document_data: Dict, document_id: str = None) \
             -> Tuple[Timestamp, DocumentReference]:
@@ -209,7 +209,7 @@ class CollectionGroup:
         for doc in docs:
             yield doc
 
-    def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+    def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> List[DocumentSnapshot]:
         return list(self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options))
 
     def list_documents(self, page_size=None):
