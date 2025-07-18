@@ -119,7 +119,10 @@ class AsyncTransaction:
             snapshots = await self._client.get_all([ref_or_query])
             return snapshots
         elif isinstance(ref_or_query, AsyncQuery):
-            return await ref_or_query.stream()
+            results = []
+            async for doc in ref_or_query.stream():
+                results.append(doc)
+            return results
         else:
             raise ValueError(
                 'Value for argument "ref_or_query" must be a AsyncDocumentReference or a AsyncQuery.'
