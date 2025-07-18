@@ -1,0 +1,524 @@
+import warnings
+from typing import Any, List, Optional, Dict, Tuple, Sequence, Union, Iterable
+import asyncio
+
+from mockfirestore import AlreadyExists
+from mockfirestore._helpers import generate_random_string, Store, get_by_path, set_by_path, Timestamp
+from mockfirestore.async_.query import AsyncQuery
+from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentSnapshot
+
+
+class AsyncCollectionReference:
+    """Asynchronous collection reference."""
+
+    def __init__(self, data: Store, path: List[str],
+                 parent: Optional[AsyncDocumentReference] = None) -> None:
+        self._data = data
+        self._path = path
+        self.parent = parent
+
+    def document(self, document_id: Optional[str] = None) -> AsyncDocumentReference:
+        """Get a document reference.
+
+        Args:
+            document_id: The document identifier.
+
+        Returns:
+            An AsyncDocumentReference.
+        """
+        # Make sure the collection exists in the data store
+        try:
+            collection = get_by_path(self._data, self._path)
+        except KeyError:
+            # Create the collection path if it doesn't exist
+            collection = get_by_path(self._data, self._path, create_nested=True)
+            
+        if document_id is None:
+            document_id = generate_random_string()
+        new_path = self._path + [document_id]
+        if document_id not in collection:
+            set_by_path(self._data, new_path, {})
+        return AsyncDocumentReference(self._data, new_path, parent=self)
+
+    async def get(self) -> Iterable[AsyncDocumentSnapshot]:
+        """Get all documents in the collection.
+
+        Returns:
+            An iterable of AsyncDocumentSnapshot objects.
+
+        Deprecated:
+            Use AsyncCollectionReference.stream instead.
+        """
+        warnings.warn('Collection.get is deprecated, please use Collection.stream',
+                      category=DeprecationWarning)
+        return await self.stream()
+
+    async def add(self, document_data: Dict, document_id: str = None) \
+            -> Tuple[Timestamp, AsyncDocumentReference]:
+        """Add a document to the collection.
+
+        Args:
+            document_data: The document data.
+            document_id: The document identifier. If not provided, it will be generated.
+
+        Returns:
+            A tuple containing the timestamp and the document reference.
+
+        Raises:
+            AlreadyExists: If the document already exists.
+        """
+        if document_id is None:
+            document_id = document_data.get('id', generate_random_string())
+        collection = get_by_path(self._data, self._path)
+        new_path = self._path + [document_id]
+        if document_id in collection:
+            raise AlreadyExists('Document already exists: {}'.format(new_path))
+        doc_ref = AsyncDocumentReference(self._data, new_path, parent=self)
+        await doc_ref.set(document_data)
+        timestamp = Timestamp.from_now()
+        return timestamp, doc_ref
+
+    def where(self, field: Optional[str] = None, op: Optional[str] = None, value: Any = None, filter=None) -> AsyncQuery:
+        """Create a query with a filter.
+
+        Args:
+            field: The field to filter on.
+            op: The operator to filter with.
+            value: The value to compare against.
+            filter: A composite filter for complex queries.
+
+        Returns:
+            An AsyncQuery with the filter applied.
+        """
+        query = AsyncQuery(self, field_filters=[AsyncQuery.make_field_filter(field, op, value, filter)])
+        return query
+
+    def order_by(self, key: str, direction: Optional[str] = None) -> AsyncQuery:
+        """Create a query with an order.
+
+        Args:
+            key: The field to order by.
+            direction: The direction to order in ('ASCENDING' or 'DESCENDING').
+
+        Returns:
+            An AsyncQuery with the order applied.
+        """
+        query = AsyncQuery(self, orders=[(key, direction)])
+        return query
+
+    def limit(self, limit_amount: int) -> AsyncQuery:
+        """Create a query with a limit.
+
+        Args:
+            limit_amount: The maximum number of documents to return.
+
+        Returns:
+            An AsyncQuery with the limit applied.
+        """
+        query = AsyncQuery(self, limit=limit_amount)
+        return query
+
+    def offset(self, offset: int) -> AsyncQuery:
+        """Create a query with an offset.
+
+        Args:
+            offset: The number of documents to skip.
+
+        Returns:
+            An AsyncQuery with the offset applied.
+        """
+        query = AsyncQuery(self, offset=offset)
+        return query
+
+    def start_at(self, document_fields_or_snapshot: Union[dict, AsyncDocumentSnapshot]) -> AsyncQuery:
+        """Create a query with a start point.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncQuery with the start point applied.
+        """
+        query = AsyncQuery(self, start_at=(document_fields_or_snapshot, True))
+        return query
+
+    def start_after(self, document_fields_or_snapshot: Union[dict, AsyncDocumentSnapshot]) -> AsyncQuery:
+        """Create a query with a start point after a document.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncQuery with the start point applied.
+        """
+        query = AsyncQuery(self, start_at=(document_fields_or_snapshot, False))
+        return query
+
+    def end_at(self, document_fields_or_snapshot: Union[dict, AsyncDocumentSnapshot]) -> AsyncQuery:
+        """Create a query with an end point.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncQuery with the end point applied.
+        """
+        query = AsyncQuery(self, end_at=(document_fields_or_snapshot, True))
+        return query
+
+    def end_before(self, document_fields_or_snapshot: Union[dict, AsyncDocumentSnapshot]) -> AsyncQuery:
+        """Create a query with an end point before a document.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncQuery with the end point applied.
+        """
+        query = AsyncQuery(self, end_at=(document_fields_or_snapshot, False))
+        return query
+
+    async def list_documents(self, page_size: Optional[int] = None) -> Sequence[AsyncDocumentReference]:
+        """List all document references in the collection.
+
+        Args:
+            page_size: The maximum number of document references to return per page.
+
+        Returns:
+            A list of AsyncDocumentReference objects.
+        """
+        docs = []
+        for key in get_by_path(self._data, self._path):
+            docs.append(self.document(key))
+        return docs
+
+    async def stream(self, transaction=None) -> Iterable[AsyncDocumentSnapshot]:
+        """Stream the documents in the collection.
+
+        Args:
+            transaction: If provided, the operation will be executed within
+                this transaction.
+
+        Returns:
+            An iterable of AsyncDocumentSnapshot objects.
+        """
+        snapshots = []
+        for key in sorted(get_by_path(self._data, self._path)):
+            doc_snapshot = await self.document(key).get()
+            snapshots.append(doc_snapshot)
+        return snapshots
+
+
+class AsyncCollectionGroup:
+    """Asynchronous collection group."""
+
+    def __init__(
+        self,
+        data: Store,
+        collection_id: str,
+        projection=None,
+        field_filters=(),
+        orders=(),
+        limit=None,
+        limit_to_last=False,
+        offset=None,
+        start_at=None,
+        end_at=None,
+        all_descendants=True,
+        recursive=False,
+    ):
+        self._data = data
+        self._collection_id = collection_id
+        self._projection = projection
+        self._field_filters = field_filters
+        self._orders = orders
+        self._limit = limit
+        self._limit_to_last = limit_to_last
+        self._offset = offset
+        self._start_at = start_at
+        self._end_at = end_at
+        self._all_descendants = all_descendants
+        self._recursive = recursive
+
+    def _find_collections(self, node, path, parent_docref=None):
+        """
+        Recursively find all subcollections matching collection_id.
+        Returns list of (collection_dict, path, parent_docref)
+        """
+        found = []
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if isinstance(value, dict) and not key.startswith("_"):
+                    if key == self._collection_id:
+                        found.append((value, path + [key], parent_docref))
+                    for doc_key, doc_value in value.items():
+                        if isinstance(doc_value, dict):
+                            # Prepare the DocumentReference for this document as parent
+                            doc_path = path + [key, doc_key]
+                            docref_parent = AsyncCollectionReference(self._data, path + [key], parent=parent_docref)
+                            docref = AsyncDocumentReference(self._data, doc_path, parent=docref_parent)
+                            found += self._find_collections(doc_value, doc_path, parent_docref=docref)
+        return found
+
+    def _copy(self, **kwargs):
+        args = dict(
+            data=self._data,
+            collection_id=self._collection_id,
+            projection=self._projection,
+            field_filters=self._field_filters,
+            orders=self._orders,
+            limit=self._limit,
+            limit_to_last=self._limit_to_last,
+            offset=self._offset,
+            start_at=self._start_at,
+            end_at=self._end_at,
+            all_descendants=self._all_descendants,
+            recursive=self._recursive,
+        )
+        args.update(kwargs)
+        return AsyncCollectionGroup(**args)
+
+    # ---- Query/Chaining methods ----
+    def where(self, field=None, op=None, value=None, filter=None):
+        """Create a query with a filter.
+
+        Args:
+            field: The field to filter on.
+            op: The operator to filter with.
+            value: The value to compare against.
+            filter: A composite filter for complex queries.
+
+        Returns:
+            An AsyncCollectionGroup with the filter applied.
+        """
+        new_filters = self._field_filters + (AsyncQuery.make_field_filter(field, op, value, filter),)
+        return self._copy(field_filters=new_filters)
+
+    def order_by(self, key, direction=None):
+        """Create a query with an order.
+
+        Args:
+            key: The field to order by.
+            direction: The direction to order in ('ASCENDING' or 'DESCENDING').
+
+        Returns:
+            An AsyncCollectionGroup with the order applied.
+        """
+        new_orders = self._orders + ((key, direction),)
+        return self._copy(orders=new_orders)
+
+    def limit(self, limit_amount):
+        """Create a query with a limit.
+
+        Args:
+            limit_amount: The maximum number of documents to return.
+
+        Returns:
+            An AsyncCollectionGroup with the limit applied.
+        """
+        return self._copy(limit=limit_amount)
+
+    def limit_to_last(self, limit_amount):
+        """Create a query with a limit, returning the last matching documents.
+
+        Args:
+            limit_amount: The maximum number of documents to return.
+
+        Returns:
+            An AsyncCollectionGroup with the limit applied.
+        """
+        return self._copy(limit=limit_amount, limit_to_last=True)
+
+    def offset(self, offset):
+        """Create a query with an offset.
+
+        Args:
+            offset: The number of documents to skip.
+
+        Returns:
+            An AsyncCollectionGroup with the offset applied.
+        """
+        return self._copy(offset=offset)
+
+    def start_at(self, document_fields_or_snapshot):
+        """Create a query with a start point.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncCollectionGroup with the start point applied.
+        """
+        return self._copy(start_at=(document_fields_or_snapshot, True))
+
+    def start_after(self, document_fields_or_snapshot):
+        """Create a query with a start point after a document.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncCollectionGroup with the start point applied.
+        """
+        return self._copy(start_at=(document_fields_or_snapshot, False))
+
+    def end_at(self, document_fields_or_snapshot):
+        """Create a query with an end point.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncCollectionGroup with the end point applied.
+        """
+        return self._copy(end_at=(document_fields_or_snapshot, True))
+
+    def end_before(self, document_fields_or_snapshot):
+        """Create a query with an end point before a document.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+
+        Returns:
+            An AsyncCollectionGroup with the end point applied.
+        """
+        return self._copy(end_at=(document_fields_or_snapshot, False))
+
+    # ---- Aggregations (stubs for API compatibility) ----
+    def count(self, alias=None):
+        """Count documents in the collection group (stub).
+
+        Args:
+            alias: An alias for the count.
+
+        Returns:
+            The collection group.
+        """
+        return self
+
+    def avg(self, field_ref, alias=None):
+        """Calculate the average of a field (stub).
+
+        Args:
+            field_ref: The field to average.
+            alias: An alias for the average.
+
+        Returns:
+            The collection group.
+        """
+        return self
+
+    def sum(self, field_ref, alias=None):
+        """Calculate the sum of a field (stub).
+
+        Args:
+            field_ref: The field to sum.
+            alias: An alias for the sum.
+
+        Returns:
+            The collection group.
+        """
+        return self
+
+    def find_nearest(
+        self,
+        vector_field,
+        query_vector,
+        limit,
+        distance_measure,
+        *,
+        distance_result_field=None,
+        distance_threshold=None
+    ):
+        """Find nearest vectors (stub).
+
+        Args:
+            vector_field: The field containing vectors.
+            query_vector: The query vector.
+            limit: The maximum number of results.
+            distance_measure: The distance measure to use.
+            distance_result_field: The field to store distance results.
+            distance_threshold: The distance threshold for inclusion.
+
+        Returns:
+            The collection group.
+        """
+        return self
+
+    # ---- Streaming/get ----
+    async def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+        """Stream the documents in the collection group.
+
+        Args:
+            transaction: If provided, the operation will be executed within this transaction.
+            retry: Retry options for the operation.
+            timeout: Timeout for the operation.
+            explain_options: Query explanation options.
+
+        Returns:
+            An iterable of AsyncDocumentSnapshot objects.
+        """
+        docs = await self._iter_documents()
+        return docs
+
+    async def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+        """Get all documents in the collection group.
+
+        Args:
+            transaction: If provided, the operation will be executed within this transaction.
+            retry: Retry options for the operation.
+            timeout: Timeout for the operation.
+            explain_options: Query explanation options.
+
+        Returns:
+            A list of AsyncDocumentSnapshot objects.
+        """
+        return await self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options)
+
+    async def list_documents(self, page_size=None):
+        """List all document references in the collection group.
+
+        Args:
+            page_size: The maximum number of document references to return per page.
+
+        Returns:
+            A list of AsyncDocumentReference objects.
+        """
+        docs = []
+        collections = self._find_collections(self._data, [], parent_docref=None)
+        for collection, path, parent_docref in collections:
+            collection_ref = AsyncCollectionReference(self._data, path, parent=parent_docref)
+            for doc_id in collection:
+                docs.append(AsyncDocumentReference(self._data, path + [doc_id], parent=collection_ref))
+        return docs
+
+    def on_snapshot(self, callback):
+        """Register a callback for snapshot updates.
+
+        Args:
+            callback: The callback to register.
+
+        Raises:
+            NotImplementedError: on_snapshot is not supported in the mock.
+        """
+        raise NotImplementedError("on_snapshot is not supported in mock.")
+
+    # ---- Internal: yield DocumentSnapshot objects, filtered ----
+    async def _iter_documents(self):
+        """Iterate through all documents in the collection group.
+
+        Returns:
+            A list of AsyncDocumentSnapshot objects.
+        """
+        collections = self._find_collections(self._data, [], parent_docref=None)
+        docs = []
+        for collection, path, parent_docref in collections:
+            collection_ref = AsyncCollectionReference(self._data, path, parent=parent_docref)
+            for doc_id in collection:
+                doc_ref = AsyncDocumentReference(self._data, path + [doc_id], parent=collection_ref)
+                docs.append(await doc_ref.get())
+        # Filtering, ordering, etc would go here.
+        return docs
+
+    def __repr__(self):
+        return f"<AsyncCollectionGroup '{self._collection_id}'>"
