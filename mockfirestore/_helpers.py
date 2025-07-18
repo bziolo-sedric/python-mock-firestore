@@ -53,6 +53,10 @@ def generate_random_string():
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(20))
 
 
+# Sentinel value for field deletion
+DELETE_FIELD = "__delete_field__"
+
+
 class Timestamp:
     """
     Imitates some properties of `google.protobuf.timestamp_pb2.Timestamp`

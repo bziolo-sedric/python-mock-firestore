@@ -7,9 +7,17 @@ try:
 except ImportError:
     from mockfirestore.exceptions import ClientError, Conflict, NotFound, AlreadyExists
 
+# Synchronous implementations
 from mockfirestore.client import MockFirestore
 from mockfirestore.document import DocumentSnapshot, DocumentReference
 from mockfirestore.collection import CollectionReference
 from mockfirestore.query import Query, And, Or
-from mockfirestore._helpers import Timestamp
+from mockfirestore._helpers import Timestamp, DELETE_FIELD
 from mockfirestore.transaction import Transaction
+
+# Asynchronous implementations
+from mockfirestore.async_ import AsyncMockFirestore
+from mockfirestore.async_.document import AsyncDocumentSnapshot, AsyncDocumentReference
+from mockfirestore.async_.collection import AsyncCollectionReference, AsyncCollectionGroup
+from mockfirestore.async_.query import AsyncQuery
+from mockfirestore.async_.transaction import AsyncTransaction, AsyncBatch
