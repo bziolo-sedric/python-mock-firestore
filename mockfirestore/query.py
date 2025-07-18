@@ -1,6 +1,9 @@
 import warnings
 from itertools import islice, tee
-from typing import Iterable, Iterator, Any, Optional, List, Callable, Union
+from typing import Iterable, Iterator, Any, Optional, List, Callable, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mockfirestore.aggregation import AggregationQuery
 
 from mockfirestore.document import DocumentSnapshot
 from mockfirestore._helpers import T
@@ -180,6 +183,44 @@ class Query:
     def select(self, field_paths: Iterable[str]) -> 'Query':
         self._projection = field_paths
         return self
+        
+    def count(self, alias: Optional[str] = None) -> 'AggregationQuery':
+        """Adds a count over the query.
+        
+        Args:
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the count aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).count(alias)
+        
+    def avg(self, field_ref, alias: Optional[str] = None) -> 'AggregationQuery':
+        """Adds an average over the query.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the average aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).avg(field_ref, alias)
+        
+    def sum(self, field_ref, alias: Optional[str] = None) -> 'AggregationQuery':
+        """Adds a sum over the query.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the sum aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).sum(field_ref, alias)
 
     def _apply_cursor(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot], doc_snapshot: Iterator[DocumentSnapshot],
                       before: bool, start: bool) -> Iterator[DocumentSnapshot]:

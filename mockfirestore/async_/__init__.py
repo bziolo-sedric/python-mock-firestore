@@ -4,3 +4,4 @@ from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentS
 from mockfirestore.async_.collection import AsyncCollectionReference, AsyncCollectionGroup
 from mockfirestore.async_.query import AsyncQuery
 from mockfirestore.async_.transaction import AsyncTransaction, AsyncBatch
+from mockfirestore.async_.aggregation import AsyncAggregationQuery

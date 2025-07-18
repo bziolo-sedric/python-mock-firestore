@@ -1,10 +1,13 @@
 import warnings
-from typing import Any, List, Optional, Iterable, Dict, Tuple, Sequence, Union
+from typing import Any, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
 
 from mockfirestore import AlreadyExists
 from mockfirestore._helpers import generate_random_string, Store, get_by_path, set_by_path, Timestamp
 from mockfirestore.query import Query
 from mockfirestore.document import DocumentReference, DocumentSnapshot
+
+if TYPE_CHECKING:
+    from mockfirestore.aggregation import AggregationQuery
 
 
 class CollectionReference:
@@ -72,6 +75,48 @@ class CollectionReference:
     def end_before(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot]) -> Query:
         query = Query(self, end_at=(document_fields_or_snapshot, False))
         return query
+        
+    def select(self, field_paths: Iterable[str]) -> Query:
+        query = Query(self, projection=field_paths)
+        return query
+        
+    def count(self, alias: Optional[str] = None) -> 'AggregationQuery':
+        """Adds a count over the collection.
+        
+        Args:
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the count aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).count(alias)
+        
+    def avg(self, field_ref, alias: Optional[str] = None) -> 'AggregationQuery':
+        """Adds an average over the collection.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the average aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).avg(field_ref, alias)
+        
+    def sum(self, field_ref, alias: Optional[str] = None) -> 'AggregationQuery':
+        """Adds a sum over the collection.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the sum aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).sum(field_ref, alias)
 
     def list_documents(self, page_size: Optional[int] = None) -> Sequence[DocumentReference]:
         docs = []
@@ -184,15 +229,44 @@ class CollectionGroup:
     def select(self, field_paths: Iterable[str]):
         return self._copy(projection=field_paths)
 
-    # ---- Aggregations (stubs for API compatibility) ----
+    # ---- Aggregations ----
     def count(self, alias=None):
-        return self
+        """Adds a count over the collection group.
+        
+        Args:
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the count aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).count(alias)
 
     def avg(self, field_ref, alias=None):
-        return self
+        """Adds an average over the collection group.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the average aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).avg(field_ref, alias)
 
     def sum(self, field_ref, alias=None):
-        return self
+        """Adds a sum over the collection group.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AggregationQuery with the sum aggregation.
+        """
+        from mockfirestore.aggregation import AggregationQuery
+        return AggregationQuery(self, alias).sum(field_ref, alias)
 
     def find_nearest(
         self,
