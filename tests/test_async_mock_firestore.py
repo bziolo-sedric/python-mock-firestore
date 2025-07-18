@@ -57,7 +57,9 @@ class TestAsyncMockFirestore(unittest.TestCase):
             })
             
             # Stream collection
-            docs = await self.mock_db.collection('users').stream()
+            docs = []
+            async for doc in self.mock_db.collection('users').stream():
+                docs.append(doc)
             self.assertEqual(len(docs), 3)
             
             # List documents
