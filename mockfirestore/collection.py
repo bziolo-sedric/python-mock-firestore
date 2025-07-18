@@ -209,7 +209,7 @@ class CollectionGroup:
         for doc in docs:
             yield doc
 
-    def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+    def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> List[DocumentSnapshot]:
         return list(self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options))
 
     def list_documents(self, page_size=None):
