@@ -1,6 +1,6 @@
 import warnings
 from itertools import islice, tee
-from typing import Iterator, Any, Optional, List, Callable, Union
+from typing import Iterable, Iterator, Any, Optional, List, Callable, Union
 
 from mockfirestore.document import DocumentSnapshot
 from mockfirestore._helpers import T
@@ -149,16 +149,16 @@ class Query:
         else:
             return (field, op, value)
 
-    def order_by(self, key: str, direction: Optional[str] = 'ASCENDING') -> 'Query':
-        self.orders.append((key, direction))
+    def order_by(self, field_path: str, direction: Optional[str] = 'ASCENDING') -> 'Query':
+        self.orders.append((field_path, direction))
         return self
 
-    def limit(self, limit_amount: int) -> 'Query':
-        self._limit = limit_amount
+    def limit(self, count: int) -> 'Query':
+        self._limit = count
         return self
 
-    def offset(self, offset_amount: int) -> 'Query':
-        self._offset = offset_amount
+    def offset(self, num_to_skip: int) -> 'Query':
+        self._offset = num_to_skip
         return self
 
     def start_at(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot]) -> 'Query':
@@ -175,6 +175,10 @@ class Query:
 
     def end_before(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot]) -> 'Query':
         self._end_at = (document_fields_or_snapshot, False)
+        return self
+
+    def select(self, field_paths: Iterable[str]) -> 'Query':
+        self._projection = field_paths
         return self
 
     def _apply_cursor(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot], doc_snapshot: Iterator[DocumentSnapshot],

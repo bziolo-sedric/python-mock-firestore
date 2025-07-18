@@ -96,41 +96,41 @@ class AsyncCollectionReference:
         query = AsyncQuery(self, field_filters=[AsyncQuery.make_field_filter(field, op, value, filter)])
         return query
 
-    def order_by(self, key: str, direction: Optional[str] = None) -> AsyncQuery:
+    def order_by(self, field_path: str, direction: Optional[str] = None) -> AsyncQuery:
         """Create a query with an order.
 
         Args:
-            key: The field to order by.
+            field_path: The field to order by.
             direction: The direction to order in ('ASCENDING' or 'DESCENDING').
 
         Returns:
             An AsyncQuery with the order applied.
         """
-        query = AsyncQuery(self, orders=[(key, direction)])
+        query = AsyncQuery(self, orders=[(field_path, direction)])
         return query
 
-    def limit(self, limit_amount: int) -> AsyncQuery:
+    def limit(self, count: int) -> AsyncQuery:
         """Create a query with a limit.
 
         Args:
-            limit_amount: The maximum number of documents to return.
+            count: The maximum number of documents to return.
 
         Returns:
             An AsyncQuery with the limit applied.
         """
-        query = AsyncQuery(self, limit=limit_amount)
+        query = AsyncQuery(self, limit=count)
         return query
 
-    def offset(self, offset: int) -> AsyncQuery:
+    def offset(self, num_to_skip: int) -> AsyncQuery:
         """Create a query with an offset.
 
         Args:
-            offset: The number of documents to skip.
+            num_to_skip: The number of documents to skip.
 
         Returns:
             An AsyncQuery with the offset applied.
         """
-        query = AsyncQuery(self, offset=offset)
+        query = AsyncQuery(self, offset=num_to_skip)
         return query
 
     def start_at(self, document_fields_or_snapshot: Union[dict, AsyncDocumentSnapshot]) -> AsyncQuery:
@@ -179,6 +179,18 @@ class AsyncCollectionReference:
             An AsyncQuery with the end point applied.
         """
         query = AsyncQuery(self, end_at=(document_fields_or_snapshot, False))
+        return query
+    
+    def select(self, field_paths: Iterable[str]):
+        """Create a query with a projection.
+        
+        Args:
+            field_paths: The fields to include in the result.
+
+        Returns:
+            An AsyncQuery with the projection applied.
+        """
+        query = AsyncQuery(self, projection=field_paths)
         return query
 
     async def list_documents(self, page_size: Optional[int] = None) -> Sequence[AsyncDocumentReference]:
@@ -295,51 +307,51 @@ class AsyncCollectionGroup:
         new_filters = self._field_filters + (AsyncQuery.make_field_filter(field, op, value, filter),)
         return self._copy(field_filters=new_filters)
 
-    def order_by(self, key, direction=None):
+    def order_by(self, field_path: str, direction: Optional[str] = None):
         """Create a query with an order.
 
         Args:
-            key: The field to order by.
+            field_path: The field to order by.
             direction: The direction to order in ('ASCENDING' or 'DESCENDING').
 
         Returns:
             An AsyncCollectionGroup with the order applied.
         """
-        new_orders = self._orders + ((key, direction),)
+        new_orders = self._orders + ((field_path, direction),)
         return self._copy(orders=new_orders)
 
-    def limit(self, limit_amount):
+    def limit(self, count: int):
         """Create a query with a limit.
 
         Args:
-            limit_amount: The maximum number of documents to return.
+            count: The maximum number of documents to return.
 
         Returns:
             An AsyncCollectionGroup with the limit applied.
         """
-        return self._copy(limit=limit_amount)
+        return self._copy(limit=count)
 
-    def limit_to_last(self, limit_amount):
+    def limit_to_last(self, count: int):
         """Create a query with a limit, returning the last matching documents.
 
         Args:
-            limit_amount: The maximum number of documents to return.
+            count: The maximum number of documents to return.
 
         Returns:
             An AsyncCollectionGroup with the limit applied.
         """
-        return self._copy(limit=limit_amount, limit_to_last=True)
+        return self._copy(limit=count, limit_to_last=True)
 
-    def offset(self, offset):
+    def offset(self, num_to_skip: int):
         """Create a query with an offset.
 
         Args:
-            offset: The number of documents to skip.
+            num_to_skip: The number of documents to skip.
 
         Returns:
             An AsyncCollectionGroup with the offset applied.
         """
-        return self._copy(offset=offset)
+        return self._copy(offset=num_to_skip)
 
     def start_at(self, document_fields_or_snapshot):
         """Create a query with a start point.
@@ -384,6 +396,17 @@ class AsyncCollectionGroup:
             An AsyncCollectionGroup with the end point applied.
         """
         return self._copy(end_at=(document_fields_or_snapshot, False))
+    
+    def select(self, field_paths: Iterable[str]):
+        """Create a query with a projection.
+        
+        Args:
+            field_paths: The fields to include in the result.
+            
+        Returns:
+            A new AsyncQuery with the projection applied.
+        """
+        return self._copy(projection=field_paths)
 
     # ---- Aggregations (stubs for API compatibility) ----
     def count(self, alias=None):
