@@ -1,4 +1,7 @@
-from typing import Any, Dict, List, Optional, Tuple, Union, Iterable
+from typing import Any, Dict, List, Optional, Tuple, Union, Iterable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mockfirestore.async_.aggregation import AsyncAggregationQuery
 import asyncio
 import operator
 import re
@@ -198,6 +201,44 @@ class AsyncQuery:
             A new AsyncQuery with the projection applied.
         """
         return self._copy(projection=field_paths)
+        
+    def count(self, alias: Optional[str] = None) -> 'AsyncAggregationQuery':
+        """Adds a count over the query.
+        
+        Args:
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AsyncAggregationQuery with the count aggregation.
+        """
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).count(alias)
+        
+    def avg(self, field_ref, alias: Optional[str] = None) -> 'AsyncAggregationQuery':
+        """Adds an average over the query.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AsyncAggregationQuery with the average aggregation.
+        """
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).avg(field_ref, alias)
+        
+    def sum(self, field_ref, alias: Optional[str] = None) -> 'AsyncAggregationQuery':
+        """Adds a sum over the query.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AsyncAggregationQuery with the sum aggregation.
+        """
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).sum(field_ref, alias)
 
     async def get(self, transaction=None):
         """Get all documents matching the query.

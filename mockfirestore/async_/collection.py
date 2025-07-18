@@ -1,11 +1,14 @@
 import warnings
-from typing import Any, List, Optional, Dict, Tuple, Sequence, Union, Iterable
+from typing import Any, List, Optional, Dict, Tuple, Sequence, Union, Iterable, TYPE_CHECKING
 import asyncio
 
 from mockfirestore import AlreadyExists
 from mockfirestore._helpers import generate_random_string, Store, get_by_path, set_by_path, Timestamp
 from mockfirestore.async_.query import AsyncQuery
 from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentSnapshot
+
+if TYPE_CHECKING:
+    from mockfirestore.async_.aggregation import AsyncAggregationQuery
 
 
 class AsyncCollectionReference:
@@ -192,6 +195,44 @@ class AsyncCollectionReference:
         """
         query = AsyncQuery(self, projection=field_paths)
         return query
+        
+    def count(self, alias: Optional[str] = None) -> 'AsyncAggregationQuery':
+        """Adds a count over the collection.
+        
+        Args:
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AsyncAggregationQuery with the count aggregation.
+        """
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).count(alias)
+
+    def avg(self, field_ref, alias: Optional[str] = None) -> 'AsyncAggregationQuery':
+        """Adds an average over the collection.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AsyncAggregationQuery with the average aggregation.
+        """
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).avg(field_ref, alias)
+
+    def sum(self, field_ref, alias: Optional[str] = None) -> 'AsyncAggregationQuery':
+        """Adds a sum over the collection.
+        
+        Args:
+            field_ref: The field to aggregate across.
+            alias: Optional name of the field to store the result.
+            
+        Returns:
+            An AsyncAggregationQuery with the sum aggregation.
+        """
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).sum(field_ref, alias)
 
     async def list_documents(self, page_size: Optional[int] = None) -> Sequence[AsyncDocumentReference]:
         """List all document references in the collection.
@@ -408,41 +449,44 @@ class AsyncCollectionGroup:
         """
         return self._copy(projection=field_paths)
 
-    # ---- Aggregations (stubs for API compatibility) ----
+    # ---- Aggregations ----
     def count(self, alias=None):
-        """Count documents in the collection group (stub).
+        """Count documents in the collection group.
 
         Args:
             alias: An alias for the count.
 
         Returns:
-            The collection group.
+            An AsyncAggregationQuery with the count aggregation.
         """
-        return self
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).count(alias)
 
     def avg(self, field_ref, alias=None):
-        """Calculate the average of a field (stub).
+        """Calculate the average of a field.
 
         Args:
             field_ref: The field to average.
             alias: An alias for the average.
 
         Returns:
-            The collection group.
+            An AsyncAggregationQuery with the average aggregation.
         """
-        return self
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).avg(field_ref, alias)
 
     def sum(self, field_ref, alias=None):
-        """Calculate the sum of a field (stub).
+        """Calculate the sum of a field.
 
         Args:
             field_ref: The field to sum.
             alias: An alias for the sum.
 
         Returns:
-            The collection group.
+            An AsyncAggregationQuery with the sum aggregation.
         """
-        return self
+        from mockfirestore.async_.aggregation import AsyncAggregationQuery
+        return AsyncAggregationQuery(self, alias).sum(field_ref, alias)
 
     def find_nearest(
         self,
