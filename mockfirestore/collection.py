@@ -298,7 +298,7 @@ class CollectionGroup:
 
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
     def _iter_documents(self) -> Iterator[DocumentReference]:
-        for collection_reference in self._find_collections(self._data, self._collection_id):
+        for collection_reference in self._find_collections():
             yield from collection_reference.list_documents()
 
     def __repr__(self):

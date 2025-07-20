@@ -563,7 +563,7 @@ class AsyncCollectionGroup:
 
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
     async def _iter_documents(self) -> AsyncIterator[AsyncDocumentReference]:
-        for collection_reference in self._find_collections(self._data, self._collection_id):
+        for collection_reference in self._find_collections():
             async for document in collection_reference.list_documents():
                 yield document
 
