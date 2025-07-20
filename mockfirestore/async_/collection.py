@@ -3,7 +3,7 @@ from typing import Any, AsyncIterator, List, Optional, Dict, Tuple, Sequence, Un
 import asyncio
 
 from mockfirestore import AlreadyExists
-from mockfirestore._helpers import generate_random_string, Store, get_by_path, is_path_element_collection_marked, set_by_path, Timestamp, traverse_dict
+from mockfirestore._helpers import PATH_ELEMENT_SEPARATOR, generate_random_string, Store, get_by_path, is_path_element_collection_marked, set_by_path, Timestamp, traverse_dict
 from mockfirestore.async_.query import AsyncQuery
 from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentSnapshot
 
@@ -303,7 +303,7 @@ class AsyncCollectionGroup:
             if not is_path_element_collection_marked(key):
                 return
 
-            collections.append(AsyncCollectionReference(self._data, current_path.split('.')))
+            collections.append(AsyncCollectionReference(self._data, current_path.split(PATH_ELEMENT_SEPARATOR)))
 
         traverse_dict(self._data, append_collection)
 

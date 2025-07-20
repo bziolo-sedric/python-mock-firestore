@@ -11,6 +11,9 @@ Document = Dict[str, Any]
 Collection = Dict[str, Document]
 Store = Dict[str, Collection]
 
+COLLECTION_FIELD_NAME_FORMAT = "__{name}_collection__"
+PATH_ELEMENT_SEPARATOR = "<.>"
+
 # NOTE 1: To allow collections as part of the dictionary, which is functionally incorrect, as per Firestore functionality,
 # NOTE 2: we need to rename the collection path elements to avoid conflicts with the dictionary keys.
 
@@ -22,7 +25,7 @@ def is_path_element_collection_marked(path: str) -> bool:
 def collection_mark_path_element(path_element: str) -> str:
     """Mark a path element to avoid conflicts with dictionary keys."""
     if not is_path_element_collection_marked(path_element):
-        return f'__{path_element}_collection__'
+        return COLLECTION_FIELD_NAME_FORMAT.format(name=path_element)
     return path_element
 
 
@@ -37,7 +40,7 @@ def collection_mark_path(path: Sequence[str]) -> Sequence[str]:
 
 def traverse_dict(dictionary: Dict[str, Any], key_value_operator: Callable[[str, str, Any], None], path: str = ""):
     for key, value in dictionary.items():
-        current_path = f"{path}.{key}" if path else key
+        current_path = f"{path}{PATH_ELEMENT_SEPARATOR}{key}" if path else key
         key_value_operator(key, current_path, value)
         if isinstance(value, dict):
             traverse_dict(value, key_value_operator, current_path)
