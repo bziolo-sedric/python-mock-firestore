@@ -2,7 +2,7 @@ import warnings
 from typing import Any, Callable, Iterator, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
 
 from mockfirestore import AlreadyExists
-from mockfirestore._helpers import generate_random_string, Store, get_by_path, is_path_element_collection_marked, set_by_path, Timestamp, traverse_dict
+from mockfirestore._helpers import PATH_ELEMENT_SEPARATOR, generate_random_string, Store, get_by_path, is_path_element_collection_marked, set_by_path, Timestamp, traverse_dict
 from mockfirestore.query import Query
 from mockfirestore.document import DocumentReference, DocumentSnapshot
 
@@ -169,7 +169,7 @@ class CollectionGroup:
             if not is_path_element_collection_marked(key):
                 return
 
-            collections.append(CollectionReference(self._data, current_path.split('.')))
+            collections.append(CollectionReference(self._data, current_path.split(PATH_ELEMENT_SEPARATOR)))
 
         traverse_dict(self._data, append_collection)
 
