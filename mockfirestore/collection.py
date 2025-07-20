@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
+from typing import Any, Callable, Iterator, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
 
 from mockfirestore import AlreadyExists
 from mockfirestore._helpers import generate_random_string, Store, get_by_path, set_by_path, Timestamp
