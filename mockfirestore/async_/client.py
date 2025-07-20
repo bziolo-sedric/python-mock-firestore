@@ -1,6 +1,6 @@
 from typing import Iterable, Sequence, List, Optional, Union
 import asyncio
-from mockfirestore._helpers import generate_random_string, Store, get_by_path
+from mockfirestore._helpers import collection_mark_path, collection_mark_path_element, generate_random_string, Store, get_by_path, set_by_path
 from mockfirestore.async_.collection import AsyncCollectionReference, AsyncCollectionGroup
 from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentSnapshot
 from mockfirestore.async_.transaction import AsyncTransaction, AsyncBatch
@@ -60,6 +60,8 @@ class AsyncMockFirestore:
         if len(path) % 2 != 1:
             raise Exception("Cannot create collection at path {}".format(path))
         
+        path = collection_mark_path(path)
+        
         name = path[-1]
 
         if len(path) > 1:
@@ -67,7 +69,7 @@ class AsyncMockFirestore:
             return current_position.collection(name)
         else:
             if name not in self._data:
-                self._data[name] = {}
+                set_by_path(self._data, [name], {})
             return AsyncCollectionReference(self._data, [name])
 
     async def collections(self) -> Sequence[AsyncCollectionReference]:
@@ -76,8 +78,10 @@ class AsyncMockFirestore:
         Returns:
             A list of AsyncCollectionReference objects.
         """
-        return [AsyncCollectionReference(self._data, [collection_name]) 
-                for collection_name in self._data]
+        return [
+            AsyncCollectionReference(self._data, [collection_name])
+            for collection_name in self._data
+        ]
 
     def collection_group(self, collection_id: str) -> "AsyncCollectionGroup":
         """Get a reference to a collection group.
@@ -88,6 +92,8 @@ class AsyncMockFirestore:
         Returns:
             An AsyncCollectionGroup instance.
         """
+        collection_id = collection_mark_path_element(collection_id)
+
         return AsyncCollectionGroup(self._data, collection_id)
 
     def reset(self):

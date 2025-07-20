@@ -1,4 +1,5 @@
 from typing import Iterable, Sequence
+from mockfirestore._helpers import collection_mark_path, collection_mark_path_element, set_by_path
 from mockfirestore.collection import CollectionReference, CollectionGroup
 from mockfirestore.document import DocumentReference, DocumentSnapshot
 from mockfirestore.transaction import Transaction, Batch
@@ -35,6 +36,8 @@ class MockFirestore:
         if len(path) % 2 != 1:
             raise Exception("Cannot create collection at path {}".format(path))
         
+        path = collection_mark_path(path)
+        
         name = path[-1]
 
         if len(path) > 1:
@@ -42,13 +45,15 @@ class MockFirestore:
             return current_position.collection(name)
         else:
             if name not in self._data:
-                self._data[name] = {}
+                set_by_path(self._data, [name], {})
             return CollectionReference(self._data, [name])
 
     def collections(self) -> Sequence[CollectionReference]:
         return [CollectionReference(self._data, [collection_name]) for collection_name in self._data]
 
     def collection_group(self, collection_id: str) -> "CollectionGroup":
+        collection_id = collection_mark_path_element(collection_id)
+
         return CollectionGroup(self._data, collection_id)
 
     def reset(self):

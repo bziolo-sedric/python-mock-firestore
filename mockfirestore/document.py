@@ -4,7 +4,7 @@ import operator
 from typing import List, Dict, Any, Optional, Iterable
 from mockfirestore import NotFound
 from mockfirestore._helpers import (
-    Timestamp, Document, Store, get_by_path, set_by_path, delete_by_path
+    Timestamp, Document, Store, collection_mark_path_element, get_by_path, set_by_path, delete_by_path
 )
 from mockfirestore._transformations import apply_transformations
 
@@ -106,9 +106,11 @@ class DocumentReference:
 
     def collection(self, name: str) -> 'CollectionReference':
         from mockfirestore.collection import CollectionReference
+        marked_name = collection_mark_path_element(name)
+
         document = get_by_path(self._data, self._path)
-        new_path = self._path + [name]
-        if name not in document:
+        new_path = self._path + [marked_name]
+        if marked_name not in document:
             set_by_path(self._data, new_path, {})
         return CollectionReference(self._data, new_path, parent=self)
 

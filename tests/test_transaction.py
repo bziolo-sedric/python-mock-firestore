@@ -1,11 +1,12 @@
 from unittest import TestCase
 from mockfirestore import MockFirestore, Transaction
+from mockfirestore._helpers import collection_mark_path_element
 
 
 class TestTransaction(TestCase):
     def setUp(self) -> None:
         self.fs = MockFirestore()
-        self.fs._data = {'foo': {
+        self.fs._data = {collection_mark_path_element('foo'): {
                 'first': {'id': 1},
                 'second': {'id': 2}
             }}
@@ -14,7 +15,7 @@ class TestTransaction(TestCase):
         with Transaction(self.fs) as transaction:
             transaction._begin()
             docs = [self.fs.collection('foo').document(doc_name)
-                    for doc_name in self.fs._data['foo']]
+                    for doc_name in self.fs._data[collection_mark_path_element('foo')]]
             results = list(transaction.get_all(docs))
             returned_docs_snapshots = [result.to_dict() for result in results]
             expected_doc_snapshots = [doc.get().to_dict() for doc in docs]

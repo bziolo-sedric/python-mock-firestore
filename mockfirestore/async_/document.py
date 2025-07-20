@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Any, TypeVar, Union
 import asyncio
 import warnings
 from datetime import datetime
-from mockfirestore._helpers import Store, get_by_path, set_by_path, Timestamp, DELETE_FIELD
+from mockfirestore._helpers import Store, collection_mark_path_element, get_by_path, set_by_path, Timestamp, DELETE_FIELD
 from mockfirestore.exceptions import NotFound
 
 T = TypeVar('T')
@@ -142,7 +142,12 @@ class AsyncDocumentReference:
             An AsyncCollectionReference.
         """
         from mockfirestore.async_.collection import AsyncCollectionReference
-        new_path = self._path + [collection_id]
+        marked_name = collection_mark_path_element(collection_id)
+
+        document = get_by_path(self._data, self._path)
+        new_path = self._path + [marked_name]
+        if marked_name not in document:
+            set_by_path(self._data, new_path, {})
         return AsyncCollectionReference(self._data, new_path, parent=self)
 
     async def get(self, field_paths=None, transaction=None, retry=None, timeout=None) -> AsyncDocumentSnapshot:

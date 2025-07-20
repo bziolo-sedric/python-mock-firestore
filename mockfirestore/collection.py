@@ -2,7 +2,7 @@ import warnings
 from typing import Any, Callable, Iterator, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
 
 from mockfirestore import AlreadyExists
-from mockfirestore._helpers import generate_random_string, Store, get_by_path, set_by_path, Timestamp
+from mockfirestore._helpers import generate_random_string, Store, get_by_path, is_path_element_collection_marked, set_by_path, Timestamp, traverse_dict
 from mockfirestore.query import Query
 from mockfirestore.document import DocumentReference, DocumentSnapshot
 
@@ -158,25 +158,27 @@ class CollectionGroup:
         self._all_descendants = all_descendants
         self._recursive = recursive
 
-    def _find_collections(self, node, path, parent_docref=None):
+    def _find_collections(self) -> List[CollectionReference]:
         """
         Recursively find all subcollections matching collection_id.
         Returns list of (collection_dict, path, parent_docref)
         """
-        found = []
-        if isinstance(node, dict):
-            for key, value in node.items():
-                if isinstance(value, dict) and not key.startswith("_"):
-                    if key == self._collection_id:
-                        found.append((value, path + [key], parent_docref))
-                    for doc_key, doc_value in value.items():
-                        if isinstance(doc_value, dict):
-                            # Prepare the DocumentReference for this document as parent
-                            doc_path = path + [key, doc_key]
-                            docref_parent = CollectionReference(self._data, path + [key], parent=parent_docref)
-                            docref = DocumentReference(self._data, doc_path, parent=docref_parent)
-                            found += self._find_collections(doc_value, doc_path, parent_docref=docref)
-        return found
+        collections: List[CollectionReference] = []
+
+        def append_collection(key: str, current_path: str, collection_dict: Dict[str, Any]):
+            if not is_path_element_collection_marked(key):
+                return
+
+            collections.append(CollectionReference(self._data, current_path.split('.')))
+
+        traverse_dict(self._data, append_collection)
+
+        relevant_collections = [
+            collection for collection in collections
+            if collection._path[-1] == self._collection_id
+        ]
+
+        return relevant_collections
 
     def _copy(self, **kwargs):
         args = dict(
@@ -296,7 +298,7 @@ class CollectionGroup:
 
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
     def _iter_documents(self) -> Iterator[DocumentReference]:
-        for collection_reference in self._find_collections(self._data, self._collection_id):
+        for collection_reference in self._find_collections():
             yield from collection_reference.list_documents()
 
     def __repr__(self):

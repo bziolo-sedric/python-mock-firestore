@@ -3,7 +3,7 @@ import random
 import string
 from datetime import datetime as dt
 from functools import reduce
-from typing import (Dict, Any, Tuple, TypeVar, Sequence, Iterator)
+from typing import (Callable, Dict, Any, Tuple, TypeVar, Sequence, Iterator)
 
 T = TypeVar('T')
 KeyValuePair = Tuple[str, Dict[str, Any]]
@@ -11,14 +11,45 @@ Document = Dict[str, Any]
 Collection = Dict[str, Document]
 Store = Dict[str, Collection]
 
+# NOTE 1: To allow collections as part of the dictionary, which is functionally incorrect, as per Firestore functionality,
+# NOTE 2: we need to rename the collection path elements to avoid conflicts with the dictionary keys.
+
+def is_path_element_collection_marked(path: str) -> bool:
+    """Check if the path is marked."""
+    return path.startswith('__') and path.endswith('_collection__')
+
+
+def collection_mark_path_element(path_element: str) -> str:
+    """Mark a path element to avoid conflicts with dictionary keys."""
+    if not is_path_element_collection_marked(path_element):
+        return f'__{path_element}_collection__'
+    return path_element
+
+
+def collection_mark_path(path: Sequence[str]) -> Sequence[str]:
+    """Mark path elements to avoid conflicts with dictionary keys."""
+    return [
+        collection_mark_path_element(
+            path_element) if i % 2 == 0 else path_element
+        for i, path_element in enumerate(path)
+    ]
+
+
+def traverse_dict(dictionary: Dict[str, Any], key_value_operator: Callable[[str, str, Any], None], path: str = ""):
+    for key, value in dictionary.items():
+        current_path = f"{path}.{key}" if path else key
+        key_value_operator(key, current_path, value)
+        if isinstance(value, dict):
+            traverse_dict(value, key_value_operator, current_path)
+
 
 def get_by_path(data: Dict[str, T], path: Sequence[str], create_nested: bool = False) -> T:
     """Access a nested object in root by item sequence."""
 
-    def get_or_create(a, b):
-        if b not in a:
-            a[b] = {}
-        return a[b]
+    def get_or_create(_data, _path):
+        if _path not in _data:
+            _data[_path] = {}
+        return _data[_path]
 
     if create_nested:
         return reduce(get_or_create, path, data)
