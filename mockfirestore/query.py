@@ -50,8 +50,9 @@ class Query:
                 self._add_field_filter(*field_filter)
 
     def stream(self, transaction=None):
-
-        doc_snapshots = self.parent.stream()
+        from mockfirestore import CollectionReference, CollectionGroup, DocumentSnapshot
+        parent: Union[CollectionReference, CollectionGroup] = self.parent
+        doc_snapshots: Iterator[DocumentSnapshot] = parent.stream(transaction=transaction)
 
         for field, compare, value in self._field_filters:
             filtered_snapshots = []

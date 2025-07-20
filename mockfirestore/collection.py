@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
+from typing import Any, Callable, Iterator, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
 
 from mockfirestore import AlreadyExists
 from mockfirestore._helpers import generate_random_string, Store, get_by_path, set_by_path, Timestamp
@@ -126,7 +126,7 @@ class CollectionReference:
 
     def stream(self, transaction=None) -> Iterable[DocumentSnapshot]:
         for key in sorted(get_by_path(self._data, self._path)):
-            doc_snapshot = self.document(key).get()
+            doc_snapshot = self.document(key).get(transaction=transaction)
             yield doc_snapshot
 
 class CollectionGroup:
@@ -281,37 +281,23 @@ class CollectionGroup:
         return self
 
     # ---- Streaming/get ----
-    def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
-        docs = list(self._iter_documents())
-        for doc in docs:
-            yield doc
+    def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> Iterator[DocumentSnapshot]:
+        for doc in self._iter_documents():
+            yield doc.get(transaction=transaction, retry=retry, timeout=timeout)
 
     def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> List[DocumentSnapshot]:
         return list(self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options))
 
-    def list_documents(self, page_size=None):
-        docs = []
-        collections = self._find_collections(self._data, [], parent_docref=None)
-        for collection, path, parent_docref in collections:
-            collection_ref = CollectionReference(self._data, path, parent=parent_docref)
-            for doc_id in collection:
-                docs.append(DocumentReference(self._data, path + [doc_id], parent=collection_ref))
-        return docs
+    def list_documents(self, page_size: Optional[int] = None) -> Iterator[DocumentReference]:
+        yield from self._iter_documents()
 
-    def on_snapshot(self, callback):
+    def on_snapshot(self, callback: Callable) -> None:
         raise NotImplementedError("on_snapshot is not supported in mock.")
 
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
-    def _iter_documents(self):
-        collections = self._find_collections(self._data, [], parent_docref=None)
-        docs = []
-        for collection, path, parent_docref in collections:
-            collection_ref = CollectionReference(self._data, path, parent=parent_docref)
-            for doc_id in collection:
-                doc_ref = DocumentReference(self._data, path + [doc_id], parent=collection_ref)
-                docs.append(doc_ref.get())
-        # Filtering, ordering, etc would go here.
-        return docs
+    def _iter_documents(self) -> Iterator[DocumentReference]:
+        for collection_reference in self._find_collections(self._data, self._collection_id):
+            yield from collection_reference.list_documents()
 
     def __repr__(self):
         return f"<CollectionGroup '{self._collection_id}'>"

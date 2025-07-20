@@ -1,5 +1,7 @@
 from typing import Dict, Any, Optional, Union, List, Type
+from mockfirestore.collection import CollectionGroup, CollectionReference
 from mockfirestore.document import DocumentSnapshot
+from mockfirestore.query import Query
 
 
 class AggregationQuery:
@@ -8,7 +10,7 @@ class AggregationQuery:
     This class implements aggregation operations over a Firestore query.
     """
 
-    def __init__(self, parent_query, alias=None):
+    def __init__(self, parent_query: Union[Query, CollectionReference, CollectionGroup], alias=None):
         """Initialize the AggregationQuery.
         
         Args:
