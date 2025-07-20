@@ -3,13 +3,14 @@ from unittest import TestCase
 from google.cloud import firestore
 
 from mockfirestore import MockFirestore, NotFound
+from mockfirestore._helpers import collection_mark_path_element
 
 
 class TestDocumentReference(TestCase):
 
     def test_get_document_by_path(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         doc = fs.document('foo/first').get()
@@ -36,7 +37,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_get_returnsDocument(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         doc = fs.collection('foo').document('first').get()
@@ -45,7 +46,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_get_documentIdEqualsKey(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         doc_ref = fs.collection('foo').document('first')
@@ -60,16 +61,16 @@ class TestDocumentReference(TestCase):
 
     def test_document_get_documentDoesNotExist(self):
         fs = MockFirestore()
-        fs._data = {'foo': {}}
+        fs._data = {collection_mark_path_element('foo'): {}}
         doc = fs.collection('foo').document('bar').get().to_dict()
         self.assertEqual({}, doc)
 
     def test_get_nestedDocument(self):
         fs = MockFirestore()
-        fs._data = {'top_collection': {
+        fs._data = {collection_mark_path_element('top_collection'): {
             'top_document': {
                 'id': 1,
-                'nested_collection': {
+                collection_mark_path_element('nested_collection'): {
                     'nested_document': {'id': 1.1}
                 }
             }
@@ -100,7 +101,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_set_setsContentOfDocument(self):
         fs = MockFirestore()
-        fs._data = {'foo': {}}
+        fs._data = {collection_mark_path_element('foo'): {}}
         doc_content = {'id': 'bar'}
         fs.collection('foo').document('bar').set(doc_content)
         doc = fs.collection('foo').document('bar').get().to_dict()
@@ -108,7 +109,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_set_mergeNewValue(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         fs.collection('foo').document('first').set({'updated': True}, merge=True)
@@ -123,7 +124,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_set_overwriteValue(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         fs.collection('foo').document('first').set({'new_id': 1}, merge=False)
@@ -132,7 +133,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_set_isolation(self):
         fs = MockFirestore()
-        fs._data = {'foo': {}}
+        fs._data = {collection_mark_path_element('foo'): {}}
         doc_content = {'id': 'bar'}
         fs.collection('foo').document('bar').set(doc_content)
         doc_content['id'] = 'new value'
@@ -141,7 +142,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_addNewValue(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         fs.collection('foo').document('first').update({'updated': True})
@@ -150,7 +151,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_changeExistingValue(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         fs.collection('foo').document('first').update({'id': 2})
@@ -166,7 +167,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_isolation(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'nested': {'id': 1}}
         }}
         update_doc = {'nested': {'id': 2}}
@@ -177,7 +178,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerIncrementBasic(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1}
         }}
         fs.collection('foo').document('first').update({'count': firestore.Increment(2)})
@@ -187,7 +188,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerIncrementNested(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {
                 'nested': {'count': 1},
                 'other': {'likes': 0},
@@ -206,7 +207,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerIncrementNonExistent(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'spicy': 'tuna'}
         }}
         fs.collection('foo').document('first').update({'count': firestore.Increment(1)})
@@ -216,7 +217,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_delete_documentDoesNotExistAfterDelete(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         fs.collection('foo').document('first').delete()
@@ -225,7 +226,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_parent(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         coll = fs.collection('foo')
@@ -234,7 +235,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerArrayUnionBasic(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"arr": [1, 2]}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"arr": [1, 2]}}}
         fs.collection("foo").document("first").update(
             {"arr": firestore.ArrayUnion([3, 4])}
         )
@@ -243,7 +244,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerArrayUnionNested(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {
                 'nested': {'arr': [1]},
                 'other': {'labels': ["a"]},
@@ -262,7 +263,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerArrayUnionNonExistent(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'spicy': 'tuna'}
         }}
         fs.collection('foo').document('first').update({'arr': firestore.ArrayUnion([1])})
@@ -272,7 +273,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_nestedFieldDotNotation(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"nested": {"value": 1, "unchanged": "foo"}}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"nested": {"value": 1, "unchanged": "foo"}}}}
 
         fs.collection("foo").document("first").update({"nested.value": 2})
 
@@ -281,7 +282,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_nestedFieldDotNotationNestedFieldCreation(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"other": None}}}  # non-existent nested field is created
+        fs._data = {collection_mark_path_element("foo"): {"first": {"other": None}}}  # non-existent nested field is created
 
         fs.collection("foo").document("first").update({"nested.value": 2})
 
@@ -290,7 +291,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_nestedFieldDotNotationMultipleNested(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"other": None}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"other": None}}}
 
         fs.collection("foo").document("first").update({"nested.subnested.value": 42})
 
@@ -299,7 +300,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_nestedFieldDotNotationMultipleNestedWithTransformer(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"other": None}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"other": None}}}
 
         fs.collection("foo").document("first").update(
             {"nested.subnested.value": firestore.ArrayUnion([1, 3])}
@@ -311,7 +312,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerSentinel(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'spicy': 'tuna'}
         }}
         fs.collection('foo').document('first').update({"spicy": firestore.DELETE_FIELD})
@@ -321,7 +322,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerArrayRemoveBasic(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"arr": [1, 2, 3, 4]}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"arr": [1, 2, 3, 4]}}}
         fs.collection("foo").document("first").update(
             {"arr": firestore.ArrayRemove([3, 4])}
         )
@@ -330,7 +331,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerArrayRemoveNonExistentField(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"arr": [1, 2, 3, 4]}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"arr": [1, 2, 3, 4]}}}
         fs.collection("foo").document("first").update(
             {"arr": firestore.ArrayRemove([5])}
         )
@@ -339,7 +340,7 @@ class TestDocumentReference(TestCase):
 
     def test_document_update_transformerArrayRemoveNonExistentArray(self):
         fs = MockFirestore()
-        fs._data = {"foo": {"first": {"arr": [1, 2, 3, 4]}}}
+        fs._data = {collection_mark_path_element("foo"): {"first": {"arr": [1, 2, 3, 4]}}}
         fs.collection("foo").document("first").update(
             {"non_existent_array": firestore.ArrayRemove([1, 2])}
         )

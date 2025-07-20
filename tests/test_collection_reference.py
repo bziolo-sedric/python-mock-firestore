@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from mockfirestore import MockFirestore, DocumentReference, DocumentSnapshot, AlreadyExists
+from mockfirestore._helpers import collection_mark_path_element
 from mockfirestore.query import Or,And
 
 class MockFieldFilter:
@@ -13,7 +14,7 @@ class MockFieldFilter:
 class TestCollectionReference(TestCase):
     def test_collection_get_returnsDocuments(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2}
         }}
@@ -29,10 +30,10 @@ class TestCollectionReference(TestCase):
 
     def test_collection_get_nestedCollection(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {
                 'id': 1,
-                'bar': {
+                collection_mark_path_element('bar'): {
                     'first_nested': {'id': 1.1}
                 }
             }
@@ -42,10 +43,10 @@ class TestCollectionReference(TestCase):
 
     def test_collection_get_nestedCollection_by_path(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {
                 'id': 1,
-                'bar': {
+                collection_mark_path_element('bar'): {
                     'first_nested': {'id': 1.1}
                 }
             }
@@ -55,7 +56,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_get_nestedCollection_collectionDoesNotExist(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         docs = list(fs.collection('foo').document('first').collection('bar').stream())
@@ -63,7 +64,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_get_nestedCollection_by_path_collectionDoesNotExist(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         docs = list(fs.collection('foo/first/bar').stream())
@@ -71,7 +72,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_get_ordersByAscendingDocumentId_byDefault(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'beta': {'id': 1},
             'alpha': {'id': 2}
         }}
@@ -80,7 +81,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereEquals(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'valid': True},
             'second': {'gumby': False}
         }}
@@ -90,7 +91,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereNotEquals(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1},
             'second': {'count': 5}
         }}
@@ -100,7 +101,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereLessThan(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1},
             'second': {'count': 5}
         }}
@@ -110,7 +111,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereLessThanOrEqual(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1},
             'second': {'count': 5}
         }}
@@ -121,7 +122,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereGreaterThan(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1},
             'second': {'count': 5}
         }}
@@ -131,7 +132,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereGreaterThanOrEqual(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1},
             'second': {'count': 5}
         }}
@@ -142,7 +143,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereMissingField(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'count': 1},
             'second': {'count': 5}
         }}
@@ -152,7 +153,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereNestedField(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'nested': {'a': 1}},
             'second': {'nested': {'a': 2}}
         }}
@@ -163,7 +164,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereIn(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'field': 'a1'},
             'second': {'field': 'a2'},
             'third': {'field': 'a3'},
@@ -177,7 +178,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereArrayContains(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'field': ['val4']},
             'second': {'field': ['val3', 'val2']},
             'third': {'field': ['val3', 'val2', 'val1']}
@@ -189,7 +190,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereArrayContainsAny(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'field': ['val4']},
             'second': {'field': ['val3', 'val2']},
             'third': {'field': ['val3', 'val2', 'val1']}
@@ -202,7 +203,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_whereNone(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'a': 'A'},
             'second': {'a': None},
             'third': {'a': 'B'}
@@ -214,7 +215,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_nestedWhereFieldFilter(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'a': 3},
             'second': {'a': 4},
             'third': {'a': 5}
@@ -238,7 +239,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_compoundAndFilter(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'a': 3, 'b': 0},
             'second': {'a': 4, 'b': 1},
             'third': {'a': 5, 'b': 1}
@@ -257,7 +258,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_compoundOrFilter(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'a': 3},
             'second': {'a': 4},
             'third': {'a': 5}
@@ -274,7 +275,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_nestedCompoundFilters(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'a': 3, 'b': 1, 'c': 10},
             'second': {'a': 4, 'b': 2, 'c': 20},
             'third': {'a': 5, 'b': 3, 'c': 30},
@@ -348,7 +349,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_orderBy(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'order': 2},
             'second': {'order': 1}
         }}
@@ -359,7 +360,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_orderBy_descending(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'order': 2},
             'second': {'order': 3},
             'third': {'order': 1}
@@ -372,7 +373,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_limit(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2}
         }}
@@ -382,7 +383,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_offset(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -395,7 +396,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_orderby_offset(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -408,7 +409,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_at(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -419,7 +420,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_at_order_by(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -430,7 +431,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_at_doc_snapshot(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3},
@@ -449,7 +450,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_after(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -460,7 +461,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_after_similar_objects(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1, 'value': 1},
             'second': {'id': 2, 'value': 2},
             'third': {'id': 3, 'value': 2},
@@ -472,7 +473,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_after_order_by(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -483,7 +484,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_start_after_doc_snapshot(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'second': {'id': 2},
             'third': {'id': 3},
             'fourth': {'id': 4},
@@ -500,7 +501,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_end_before(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -511,7 +512,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_end_before_order_by(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -522,7 +523,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_end_before_doc_snapshot(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3},
@@ -541,7 +542,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_end_at(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -552,7 +553,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_end_at_order_by(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3}
@@ -563,7 +564,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_end_at_doc_snapshot(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1},
             'second': {'id': 2},
             'third': {'id': 3},
@@ -583,7 +584,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_limitAndOrderBy(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'order': 2},
             'second': {'order': 1},
             'third': {'order': 3}
@@ -594,7 +595,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_listDocuments(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'order': 2},
             'second': {'order': 1},
             'third': {'order': 3}
@@ -606,7 +607,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_stream(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'order': 2},
             'second': {'order': 1},
             'third': {'order': 3}
@@ -618,7 +619,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_parent(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'order': 2},
             'second': {'order': 1},
             'third': {'order': 3}
@@ -631,7 +632,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_addDocument(self):
         fs = MockFirestore()
-        fs._data = {'foo': {}}
+        fs._data = {collection_mark_path_element('foo'): {}}
         doc_id = 'bar'
         doc_content = {'id': doc_id, 'xy': 'z'}
         timestamp, doc_ref = fs.collection('foo').add(doc_content)
@@ -645,7 +646,7 @@ class TestCollectionReference(TestCase):
 
     def test_collection_useDocumentIdKwarg(self):
         fs = MockFirestore()
-        fs._data = {'foo': {
+        fs._data = {collection_mark_path_element('foo'): {
             'first': {'id': 1}
         }}
         doc = fs.collection('foo').document(document_id='first').get()
