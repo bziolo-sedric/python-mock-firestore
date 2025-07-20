@@ -10,7 +10,7 @@ except ImportError:
 # Synchronous implementations
 from mockfirestore.client import MockFirestore
 from mockfirestore.document import DocumentSnapshot, DocumentReference
-from mockfirestore.collection import CollectionReference
+from mockfirestore.collection import CollectionReference, CollectionGroup
 from mockfirestore.query import Query, And, Or
 from mockfirestore._helpers import Timestamp, DELETE_FIELD
 from mockfirestore.transaction import Transaction
