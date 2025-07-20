@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, List, Optional, Dict, Tuple, Sequence, Union, Iterable, TYPE_CHECKING
+from typing import Any, AsyncIterator, List, Optional, Dict, Tuple, Sequence, Union, Iterable, TYPE_CHECKING
 import asyncio
 
 from mockfirestore import AlreadyExists
@@ -234,7 +234,7 @@ class AsyncCollectionReference:
         from mockfirestore.async_.aggregation import AsyncAggregationQuery
         return AsyncAggregationQuery(self, alias).sum(field_ref, alias)
 
-    async def list_documents(self, page_size: Optional[int] = None) -> Sequence[AsyncDocumentReference]:
+    async def list_documents(self, page_size: Optional[int] = None) -> AsyncIterator[AsyncDocumentReference]:
         """List all document references in the collection.
 
         Args:
@@ -243,10 +243,8 @@ class AsyncCollectionReference:
         Returns:
             A list of AsyncDocumentReference objects.
         """
-        docs = []
         for key in get_by_path(self._data, self._path):
-            docs.append(self.document(key))
-        return docs
+            yield self.document(key)
 
     async def stream(self, transaction=None):
         """Stream the documents in the collection.
@@ -514,7 +512,7 @@ class AsyncCollectionGroup:
         return self
 
     # ---- Streaming/get ----
-    async def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+    async def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> AsyncIterator[AsyncDocumentSnapshot]:
         """Stream the documents in the collection group.
 
         Args:
@@ -526,14 +524,10 @@ class AsyncCollectionGroup:
         Returns:
             An asynchronous iterator of AsyncDocumentSnapshot objects.
         """
-        collections = self._find_collections(self._data, [], parent_docref=None)
-        for collection, path, parent_docref in collections:
-            collection_ref = AsyncCollectionReference(self._data, path, parent=parent_docref)
-            for doc_id in collection:
-                doc_ref = AsyncDocumentReference(self._data, path + [doc_id], parent=collection_ref)
-                yield await doc_ref.get()
+        async for doc in self._iter_documents():
+            yield doc.get(transaction=transaction, retry=retry, timeout=timeout)
 
-    async def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None):
+    async def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> List[AsyncDocumentSnapshot]:
         """Get all documents in the collection group.
 
         Args:
@@ -547,25 +541,12 @@ class AsyncCollectionGroup:
         """
         results = []
         async for doc in self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options):
-            results.append(doc)
+            results.append(await doc)
         return results
 
-    async def list_documents(self, page_size=None):
-        """List all document references in the collection group.
-
-        Args:
-            page_size: The maximum number of document references to return per page.
-
-        Returns:
-            A list of AsyncDocumentReference objects.
-        """
-        docs = []
-        collections = self._find_collections(self._data, [], parent_docref=None)
-        for collection, path, parent_docref in collections:
-            collection_ref = AsyncCollectionReference(self._data, path, parent=parent_docref)
-            for doc_id in collection:
-                docs.append(AsyncDocumentReference(self._data, path + [doc_id], parent=collection_ref))
-        return docs
+    async def list_documents(self, page_size: Optional[int] = None) -> AsyncIterator[AsyncDocumentReference]:
+        async for doc in self._iter_documents():
+            yield doc
 
     def on_snapshot(self, callback):
         """Register a callback for snapshot updates.
@@ -579,18 +560,10 @@ class AsyncCollectionGroup:
         raise NotImplementedError("on_snapshot is not supported in mock.")
 
     # ---- Internal: yield DocumentSnapshot objects, filtered ----
-    async def _iter_documents(self):
-        """Iterate through all documents in the collection group.
-        
-        This method is deprecated. Use stream() instead.
-
-        Returns:
-            A list of AsyncDocumentSnapshot objects.
-        """
-        results = []
-        async for doc in self.stream():
-            results.append(doc)
-        return results
+    async def _iter_documents(self) -> AsyncIterator[AsyncDocumentReference]:
+        for collection_reference in self._find_collections():
+            async for document in collection_reference.list_documents():
+                yield document
 
     def __repr__(self):
         return f"<AsyncCollectionGroup '{self._collection_id}'>"
