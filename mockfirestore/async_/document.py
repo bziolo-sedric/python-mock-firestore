@@ -145,7 +145,7 @@ class AsyncDocumentReference:
         new_path = self._path + [collection_id]
         return AsyncCollectionReference(self._data, new_path, parent=self)
 
-    async def get(self, field_paths=None, transaction=None) -> AsyncDocumentSnapshot:
+    async def get(self, field_paths=None, transaction=None, retry=None, timeout=None) -> AsyncDocumentSnapshot:
         """Get a document snapshot.
 
         Args:
