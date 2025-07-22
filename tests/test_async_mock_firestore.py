@@ -99,6 +99,33 @@ class TestAsyncMockFirestore(unittest.TestCase):
             
         asyncio.run(test())
         
+    def test_create_document(self):
+        async def test():
+            # Test creating a new document
+            doc_ref = self.mock_db.collection('users').document('mcurie')
+            
+            await doc_ref.create({
+                'first': 'Marie',
+                'last': 'Curie',
+                'born': 1867
+            })
+            
+            # Check it was created
+            doc = await doc_ref.get()
+            self.assertTrue(doc.exists)
+            self.assertEqual(doc.to_dict(), {
+                'first': 'Marie',
+                'last': 'Curie',
+                'born': 1867
+            })
+            
+            # Test creating a document that already exists
+            from mockfirestore import AlreadyExists
+            with self.assertRaises(AlreadyExists):
+                await doc_ref.create({'some': 'data'})
+            
+        asyncio.run(test())
+        
     def test_transaction(self):
         async def test():
             async with self.mock_db.transaction() as transaction:
