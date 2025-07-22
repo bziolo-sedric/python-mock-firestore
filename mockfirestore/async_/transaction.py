@@ -1,24 +1,17 @@
 from functools import partial
 from typing import Iterable, Callable, List
-import asyncio
 
-from mockfirestore._helpers import generate_random_string, Timestamp, FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+from mockfirestore._helpers import generate_random_string, FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
 from mockfirestore import InvalidArgument
 from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentSnapshot
 from mockfirestore.async_.query import AsyncQuery
+from mockfirestore.write_result import WriteResult
 
 MAX_ATTEMPTS = 5
 _MISSING_ID_TEMPLATE = "The transaction has no transaction ID, so it cannot be {}."
 _CANT_BEGIN = "The transaction has already begun. Current transaction ID: {!r}."
 _CANT_ROLLBACK = _MISSING_ID_TEMPLATE.format("rolled back")
 _CANT_COMMIT = _MISSING_ID_TEMPLATE.format("committed")
-
-
-class AsyncWriteResult:
-    """Asynchronous write result."""
-    
-    def __init__(self):
-        self.update_time = Timestamp.from_now()
 
 
 class AsyncTransaction:
@@ -72,12 +65,12 @@ class AsyncTransaction:
 
         self._clean_up()
 
-    async def _commit(self) -> List[AsyncWriteResult]:
+    async def _commit(self) -> List[WriteResult]:
         """Commit the transaction.
         
         Returns:
-            A list of AsyncWriteResult objects.
-            
+            A list of WriteResult objects.
+
         Raises:
             ValueError: If the transaction is not in progress.
         """
@@ -87,7 +80,7 @@ class AsyncTransaction:
         results = []
         for write_op in self._write_ops:
             await write_op()
-            results.append(AsyncWriteResult())
+            results.append(WriteResult())
         self.write_results = results
         self._clean_up()
         return results
@@ -216,33 +209,41 @@ class AsyncTransaction:
         write_op = reference.delete
         self._add_write_op(write_op)
 
-    async def commit(self):
+    async def commit(self) -> List[WriteResult]:
         """Commit the transaction.
         
         Returns:
-            A list of AsyncWriteResult objects.
+            List[WriteResult]: A list of write results for each write operation.
         """
         return await self._commit()
 
     async def __aenter__(self):
-        """Start an asynchronous transaction."""
+        """Start an asynchronous transaction.
+        
+        Returns:
+            AsyncTransaction: The transaction instance.
+        """
         self._begin()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """End an asynchronous transaction."""
+        """End an asynchronous transaction.
+        
+        If no exception was raised, commits the transaction,
+        otherwise does nothing.
+        """
         if exc_type is None:
             await self.commit()
 
 
 class AsyncBatch(AsyncTransaction):
     """Asynchronous batch implementation."""
-    
-    async def commit(self):
+
+    async def commit(self) -> List[WriteResult]:
         """Commit the batch.
         
         Returns:
-            A list of AsyncWriteResult objects.
+            List[WriteResult]: A list of write results for each write operation.
         """
         self._begin()  # batch can call commit many times
         return await super()._commit()
