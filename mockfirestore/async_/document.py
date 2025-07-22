@@ -1,9 +1,13 @@
 from typing import Dict, List, Optional, Any, TypeVar, Union
 import asyncio
 import warnings
+from copy import deepcopy
 from datetime import datetime
-from mockfirestore._helpers import Store, collection_mark_path_element, get_by_path, set_by_path, Timestamp, DELETE_FIELD
-from mockfirestore.exceptions import NotFound
+from mockfirestore._helpers import (
+    Store, collection_mark_path_element, get_by_path, set_by_path, Timestamp, DELETE_FIELD,
+    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+)
+from mockfirestore import NotFound, InvalidArgument
 
 T = TypeVar('T')
 
@@ -171,6 +175,41 @@ class AsyncDocumentReference:
         except KeyError:
             return AsyncDocumentSnapshot(self, None)
 
+    async def create(self, document_data: Dict, retry=None, timeout=None) -> None:
+        """Create a document if it doesn't exist.
+
+        Args:
+            document_data: The document data.
+            retry: Retry configuration used if the operation fails.
+            timeout: Timeout for the operation.
+
+        Raises:
+            AlreadyExists: If the document already exists.
+            InvalidArgument: If the document exceeds the 1MB size limit.
+        """
+        # Check document size before creating
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
+            
+        # Check if document already exists
+        try:
+            existing_doc = get_by_path(self._data, self._path)
+            if existing_doc:  # Document exists and has data
+                from mockfirestore import AlreadyExists
+                raise AlreadyExists(f"Document already exists: {self._path}")
+        except KeyError:
+            # KeyError means document path doesn't exist yet - this is good
+            pass
+            
+        # Document doesn't exist or is empty, so we can create it
+        set_by_path(self._data, self._path, document_data)
+        self._update_time = Timestamp.from_now()
+        
+        return None
+        
     async def set(self, document_data: Dict, merge: bool = False) -> None:
         """Set document data.
 
