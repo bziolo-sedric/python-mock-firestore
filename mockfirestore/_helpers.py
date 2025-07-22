@@ -151,10 +151,6 @@ def calculate_document_size(document_data: Dict[str, Any]) -> int:
     return _estimate(document_data, skip_collections=True)
 
 
-# Sentinel value for field deletion
-DELETE_FIELD = "__delete_field__"
-
-
 class Timestamp:
     """
     Imitates some properties of `google.protobuf.timestamp_pb2.Timestamp`
