@@ -1,21 +1,17 @@
 from functools import partial
-from typing import Iterable, Callable
+from typing import Iterable, Callable, List
 
-from mockfirestore._helpers import generate_random_string, Timestamp, FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+from mockfirestore._helpers import generate_random_string, FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
 from mockfirestore import InvalidArgument
 from mockfirestore.document import DocumentReference, DocumentSnapshot
 from mockfirestore.query import Query
+from mockfirestore.write_result import WriteResult
 
 MAX_ATTEMPTS = 5
 _MISSING_ID_TEMPLATE = "The transaction has no transaction ID, so it cannot be {}."
 _CANT_BEGIN = "The transaction has already begun. Current transaction ID: {!r}."
 _CANT_ROLLBACK = _MISSING_ID_TEMPLATE.format("rolled back")
 _CANT_COMMIT = _MISSING_ID_TEMPLATE.format("committed")
-
-
-class WriteResult:
-    def __init__(self):
-        self.update_time = Timestamp.from_now()
 
 
 class Transaction:
@@ -55,7 +51,7 @@ class Transaction:
 
         self._clean_up()
 
-    def _commit(self) -> Iterable[WriteResult]:
+    def _commit(self) -> List[WriteResult]:
         if not self.in_progress:
             raise ValueError(_CANT_COMMIT)
 
@@ -133,8 +129,12 @@ class Transaction:
         write_op = partial(reference.set, document_data, merge=merge)
         self._add_write_op(write_op)
 
-    def update(self, reference: DocumentReference,
-               field_updates: dict, option=None):
+    def update(
+        self, 
+        reference: DocumentReference,
+        field_updates: dict, 
+        option=None
+    ):
         """Update a document.
         
         Args:
@@ -150,22 +150,56 @@ class Transaction:
         write_op = partial(reference.update, field_updates)
         self._add_write_op(write_op)
 
-    def delete(self, reference: DocumentReference, option=None):
+    def delete(
+        self, 
+        reference: DocumentReference, 
+        option=None
+    ):
+        """Delete a document.
+        
+        Args:
+            reference: The document reference.
+            option: If provided, restricts the delete to certain field paths.
+            
+        Returns:
+            Timestamp: The time that the delete request was received by the server.
+        """
         write_op = reference.delete
         self._add_write_op(write_op)
 
-    def commit(self):
+    def commit(self) -> List[WriteResult]:
+        """Commit the transaction.
+        
+        Returns:
+            List[WriteResult]: A list of write results for each write operation.
+        """
         return self._commit()
 
     def __enter__(self):
+        """Start a transaction.
+        
+        Returns:
+            Transaction: The transaction instance.
+        """
+        self._begin()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """End a transaction.
+        
+        If no exception was raised, commits the transaction,
+        otherwise does nothing.
+        """
         if exc_type is None:
             self.commit()
 
 
 class Batch(Transaction):
     def commit(self):
+        """Commit the batch.
+        
+        Returns:
+            List[WriteResult]: A list of write results for each write operation.
+        """
         self._begin()  # batch can call commit many times
-        super(Batch, self).commit()
+        return super(Batch, self).commit()

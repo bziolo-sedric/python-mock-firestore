@@ -1,6 +1,4 @@
 from typing import Dict, List, Optional, Any, TypeVar, Union, TYPE_CHECKING
-import asyncio
-import warnings
 import copy
 from datetime import datetime
 from mockfirestore._helpers import (
@@ -9,6 +7,7 @@ from mockfirestore._helpers import (
 )
 from mockfirestore import NotFound as NotFoundError, InvalidArgument
 from mockfirestore._transformations import preview_transformations, apply_transformations
+from mockfirestore.write_result import WriteResult
 
 # Forward references for type checking
 if TYPE_CHECKING:
@@ -181,7 +180,7 @@ class AsyncDocumentReference:
         except KeyError:
             return AsyncDocumentSnapshot(self, None)
 
-    async def create(self, document_data: Dict, retry=None, timeout=None) -> None:
+    async def create(self, document_data: Dict, retry=None, timeout=None) -> WriteResult:
         """Create a document if it doesn't exist.
 
         Args:
@@ -192,6 +191,9 @@ class AsyncDocumentReference:
         Raises:
             AlreadyExists: If the document already exists.
             InvalidArgument: If the document exceeds the 1MB size limit.
+            
+        Returns:
+            WriteResult: The write result corresponding to the committed document.
         """
         # Check document size before creating
         doc_size = calculate_document_size(document_data)
@@ -213,10 +215,10 @@ class AsyncDocumentReference:
         # Document doesn't exist or is empty, so we can create it
         set_by_path(self._data, self._path, document_data)
         self._update_time = Timestamp.from_now()
-        
-        return None
-        
-    async def set(self, document_data: Dict, merge: bool = False) -> None:
+
+        return WriteResult()
+
+    async def set(self, document_data: Dict, merge: bool = False) -> WriteResult:
         """Set document data.
 
         Args:
@@ -225,6 +227,9 @@ class AsyncDocumentReference:
             
         Raises:
             InvalidArgument: If the document exceeds the 1MB size limit.
+            
+        Returns:
+            WriteResult: The write result corresponding to the committed document.
         """
         # Check document size before setting
         doc_size = calculate_document_size(document_data)
@@ -259,9 +264,22 @@ class AsyncDocumentReference:
         else:
             set_by_path(self._data, self._path, document_data_copy)
         self._update_time = Timestamp.from_now()
-        return None
+        
+        return WriteResult()
 
-    async def update(self, data: Dict[str, Any]) -> None:
+    async def update(self, data: Dict[str, Any]) -> WriteResult:
+        """Update document data.
+        
+        Args:
+            data: The document data to update.
+            
+        Raises:
+            NotFound: If the document does not exist.
+            InvalidArgument: If the document exceeds the 1MB size limit.
+            
+        Returns:
+            WriteResult: The write result corresponding to the updated document.
+        """
         # Get document snapshot using await since get() is an async method
         doc_snapshot = await self.get()
         if not doc_snapshot.exists:
@@ -283,12 +301,20 @@ class AsyncDocumentReference:
         
         # Apply the update to the actual document only if size check passes
         apply_transformations(document, updates)
+        
+        # Update the update time
+        self._update_time = Timestamp.from_now()
 
-    async def delete(self, option=None) -> None:
+        return WriteResult()
+
+    async def delete(self, option=None) -> Timestamp:
         """Delete the document.
 
         Args:
             option: If provided, restricts the delete to certain field paths.
+            
+        Returns:
+            Timestamp: The time that the delete request was received by the server.
         """
         parent_path, doc_id = self._path[:-1], self._path[-1]
         try:
@@ -297,9 +323,7 @@ class AsyncDocumentReference:
                 parent_dict.pop(doc_id)
         except KeyError:
             pass
-        return None
         
-
-
-    # These helper methods are no longer needed as we're using apply_transformations
-    # which already handles recursive updates, nested fields, and field deletions.
+        # According to the Firestore API, delete returns a timestamp
+        delete_time = Timestamp.from_now()
+        return delete_time
