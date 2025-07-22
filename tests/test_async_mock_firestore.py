@@ -204,9 +204,9 @@ class TestAsyncMockFirestore(unittest.TestCase):
         async def test():
             from mockfirestore import DELETE_FIELD
             
-            # Test with DELETE_FIELD constant
+            # Test with DELETE_FIELD value (the proper way to use it)
             doc_ref = self.mock_db.collection('users').document('alovelace')
-            await doc_ref.update({DELETE_FIELD: 'born'})
+            await doc_ref.update({'born': DELETE_FIELD})
             
             # Verify the field is deleted
             doc = await doc_ref.get()
@@ -215,8 +215,8 @@ class TestAsyncMockFirestore(unittest.TestCase):
             # Add the field back
             await doc_ref.update({'born': 1815})
             
-            # Test with object-style syntax
-            await doc_ref.update({f"{DELETE_FIELD}": 'born'})
+            # Test with field path syntax
+            await doc_ref.update({'born': DELETE_FIELD})
             
             # Verify the field is deleted again
             doc = await doc_ref.get()
