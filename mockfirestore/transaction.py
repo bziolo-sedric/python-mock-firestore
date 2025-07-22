@@ -1,7 +1,8 @@
 from functools import partial
 from typing import Iterable, Callable
 
-from mockfirestore._helpers import generate_random_string, Timestamp
+from mockfirestore._helpers import generate_random_string, Timestamp, FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+from mockfirestore import InvalidArgument
 from mockfirestore.document import DocumentReference, DocumentSnapshot
 from mockfirestore.query import Query
 
@@ -91,17 +92,61 @@ class Transaction:
         self._write_ops.append(write_op)
 
     def create(self, reference: DocumentReference, document_data):
+        """Create a document.
+        
+        Args:
+            reference: The document reference.
+            document_data: The document data.
+            
+        Raises:
+            InvalidArgument: If the document exceeds the 1MB size limit.
+        """
+        # Check document size before creating
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
         # this is a no-op, because if we have a DocumentReference
         # it's already in the MockFirestore
         ...
 
     def set(self, reference: DocumentReference, document_data: dict,
             merge=False):
+        """Set a document.
+        
+        Args:
+            reference: The document reference.
+            document_data: The document data.
+            merge: If True, fields omitted will remain unchanged.
+            
+        Raises:
+            InvalidArgument: If the document exceeds the 1MB size limit.
+        """
+        # Check document size before setting
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
+            
         write_op = partial(reference.set, document_data, merge=merge)
         self._add_write_op(write_op)
 
     def update(self, reference: DocumentReference,
                field_updates: dict, option=None):
+        """Update a document.
+        
+        Args:
+            reference: The document reference.
+            field_updates: The fields to update and their values.
+            option: If provided, restricts the update to certain field paths.
+            
+        Raises:
+            InvalidArgument: If the document exceeds the 1MB size limit after update.
+        """
+        # For update operations, the size check is done inside the DocumentReference.update method
+        # which is called when the transaction is committed
         write_op = partial(reference.update, field_updates)
         self._add_write_op(write_op)
 

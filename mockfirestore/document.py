@@ -2,11 +2,12 @@ from copy import deepcopy
 from functools import reduce
 import operator
 from typing import List, Dict, Any, Optional, Iterable
-from mockfirestore import NotFound
+from mockfirestore import NotFound, InvalidArgument
 from mockfirestore._helpers import (
-    Timestamp, Document, Store, collection_mark_path_element, get_by_path, set_by_path, delete_by_path
+    Timestamp, Document, Store, collection_mark_path_element, get_by_path, set_by_path, delete_by_path,
+    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
 )
-from mockfirestore._transformations import apply_transformations
+from mockfirestore._transformations import apply_transformations, preview_transformations
 
 
 class DocumentSnapshot:
@@ -89,6 +90,13 @@ class DocumentReference:
         delete_by_path(self._data, self._path)
 
     def set(self, document_data: Dict, merge: bool = False):
+        # Check document size before setting
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
+            
         if merge:
             try:
                 self.update(deepcopy(document_data))
@@ -101,7 +109,18 @@ class DocumentReference:
         document = get_by_path(self._data, self._path)
         if document == {}:
             raise NotFound('No document to update: {}'.format(self._path))
-
+            
+        # Preview transformations to check size without modifying the original document
+        updated_doc = preview_transformations(document, deepcopy(data))
+        
+        # Check document size after applying updates
+        doc_size = calculate_document_size(updated_doc)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes after update. Current size: {doc_size} bytes."
+            )
+        
+        # Apply the update to the actual document only if size check passes
         apply_transformations(document, deepcopy(data))
 
     def collection(self, name: str) -> 'CollectionReference':
@@ -120,4 +139,10 @@ class DocumentReference:
         retry: Optional[Any] = None,
         timeout: Optional[float] = None,
     ):
+        # Check document size before creating
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
         self.set(document_data=document_data, merge=False)

@@ -99,6 +99,33 @@ class TestAsyncMockFirestore(unittest.TestCase):
             
         asyncio.run(test())
         
+    def test_create_document(self):
+        async def test():
+            # Test creating a new document
+            doc_ref = self.mock_db.collection('users').document('mcurie')
+            
+            await doc_ref.create({
+                'first': 'Marie',
+                'last': 'Curie',
+                'born': 1867
+            })
+            
+            # Check it was created
+            doc = await doc_ref.get()
+            self.assertTrue(doc.exists)
+            self.assertEqual(doc.to_dict(), {
+                'first': 'Marie',
+                'last': 'Curie',
+                'born': 1867
+            })
+            
+            # Test creating a document that already exists
+            from mockfirestore import AlreadyExists
+            with self.assertRaises(AlreadyExists):
+                await doc_ref.create({'some': 'data'})
+            
+        asyncio.run(test())
+        
     def test_transaction(self):
         async def test():
             async with self.mock_db.transaction() as transaction:
@@ -177,9 +204,9 @@ class TestAsyncMockFirestore(unittest.TestCase):
         async def test():
             from mockfirestore import DELETE_FIELD
             
-            # Test with DELETE_FIELD constant
+            # Test with DELETE_FIELD value (the proper way to use it)
             doc_ref = self.mock_db.collection('users').document('alovelace')
-            await doc_ref.update({DELETE_FIELD: 'born'})
+            await doc_ref.update({'born': DELETE_FIELD})
             
             # Verify the field is deleted
             doc = await doc_ref.get()
@@ -188,8 +215,8 @@ class TestAsyncMockFirestore(unittest.TestCase):
             # Add the field back
             await doc_ref.update({'born': 1815})
             
-            # Test with object-style syntax
-            await doc_ref.update({f"{DELETE_FIELD}": 'born'})
+            # Test with field path syntax
+            await doc_ref.update({'born': DELETE_FIELD})
             
             # Verify the field is deleted again
             doc = await doc_ref.get()

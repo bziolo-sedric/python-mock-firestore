@@ -1,9 +1,19 @@
-from typing import Dict, List, Optional, Any, TypeVar, Union
+from typing import Dict, List, Optional, Any, TypeVar, Union, TYPE_CHECKING
 import asyncio
 import warnings
+import copy
 from datetime import datetime
-from mockfirestore._helpers import Store, collection_mark_path_element, get_by_path, set_by_path, Timestamp, DELETE_FIELD
-from mockfirestore.exceptions import NotFound
+from mockfirestore._helpers import (
+    Store, collection_mark_path_element, get_by_path, set_by_path, Timestamp,
+    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+)
+from mockfirestore import NotFound as NotFoundError, InvalidArgument
+from mockfirestore._transformations import preview_transformations, apply_transformations
+
+# Forward references for type checking
+if TYPE_CHECKING:
+    from mockfirestore.async_.collection import AsyncCollectionReference
+
 
 T = TypeVar('T')
 
@@ -171,85 +181,108 @@ class AsyncDocumentReference:
         except KeyError:
             return AsyncDocumentSnapshot(self, None)
 
+    async def create(self, document_data: Dict, retry=None, timeout=None) -> None:
+        """Create a document if it doesn't exist.
+
+        Args:
+            document_data: The document data.
+            retry: Retry configuration used if the operation fails.
+            timeout: Timeout for the operation.
+
+        Raises:
+            AlreadyExists: If the document already exists.
+            InvalidArgument: If the document exceeds the 1MB size limit.
+        """
+        # Check document size before creating
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
+            
+        # Check if document already exists
+        try:
+            existing_doc = get_by_path(self._data, self._path)
+            if existing_doc:  # Document exists and has data
+                from mockfirestore import AlreadyExists
+                raise AlreadyExists(f"Document already exists: {self._path}")
+        except KeyError:
+            # KeyError means document path doesn't exist yet - this is good
+            pass
+            
+        # Document doesn't exist or is empty, so we can create it
+        set_by_path(self._data, self._path, document_data)
+        self._update_time = Timestamp.from_now()
+        
+        return None
+        
     async def set(self, document_data: Dict, merge: bool = False) -> None:
         """Set document data.
 
         Args:
             document_data: The document data.
             merge: If True, fields omitted will remain unchanged.
+            
+        Raises:
+            InvalidArgument: If the document exceeds the 1MB size limit.
         """
+        # Check document size before setting
+        doc_size = calculate_document_size(document_data)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes. Current size: {doc_size} bytes."
+            )
+
+        document_data_copy = copy.deepcopy(document_data)
+            
         if merge:
             try:
                 existing_data = get_by_path(self._data, self._path)
-                self._recursive_update(existing_data, document_data)
+                
+                # Make a copy for size checking
+                test_data = copy.deepcopy(existing_data)
+
+                # Use preview_transformations to simulate the merge without modifying data
+                preview_data = preview_transformations(test_data, document_data_copy)
+
+                # Check the size after merge
+                merged_size = calculate_document_size(preview_data)
+                if merged_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+                    raise InvalidArgument(
+                        f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes after merge. Current size: {merged_size} bytes."
+                    )
+                
+                # Apply the update to the actual document using apply_transformations
+                apply_transformations(existing_data, document_data_copy)
             except KeyError:
-                set_by_path(self._data, self._path, document_data)
+                set_by_path(self._data, self._path, document_data_copy)
         else:
-            set_by_path(self._data, self._path, document_data)
+            set_by_path(self._data, self._path, document_data_copy)
         self._update_time = Timestamp.from_now()
         return None
 
-    async def update(self, field_updates: Dict, option=None) -> None:
-        """Update fields in the document.
+    async def update(self, data: Dict[str, Any]) -> None:
+        # Get document snapshot using await since get() is an async method
+        doc_snapshot = await self.get()
+        if not doc_snapshot.exists:
+            raise NotFoundError()
 
-        Args:
-            field_updates: The fields to update and their values.
-            option: If provided, restricts the update to certain field paths.
+        document = get_by_path(self._data, self._path)
 
-        Raises:
-            NotFound: If the document doesn't exist.
-        """
-        try:
-            existing_data = get_by_path(self._data, self._path)
-        except KeyError:
-            raise NotFound('No document to update: {}'.format(self._path))
+        updates = copy.deepcopy(data)
 
-        for key, val in field_updates.items():
-            if key == DELETE_FIELD:
-                if isinstance(val, str):
-                    self._delete_field(existing_data, val.split('.'))
-            elif isinstance(key, str) and key.startswith(DELETE_FIELD):
-                # Handle the case when DELETE_FIELD is used as a sentinel object
-                # This supports the syntax: {firestore.DELETE_FIELD: "field_name"}
-                field_to_delete = val
-                if isinstance(field_to_delete, str):
-                    self._delete_field(existing_data, field_to_delete.split('.'))
-            elif '.' in key:
-                self._update_nested_field(existing_data, key, val)
-            elif key.startswith('arrayUnion.'):
-                field_name = key[len('arrayUnion.'):]
-                if field_name in existing_data and isinstance(existing_data[field_name], list):
-                    if isinstance(val, list):
-                        for item in val:
-                            if item not in existing_data[field_name]:
-                                existing_data[field_name].append(item)
-                    else:
-                        if val not in existing_data[field_name]:
-                            existing_data[field_name].append(val)
-                else:
-                    existing_data[field_name] = val if isinstance(val, list) else [val]
-            elif key.startswith('arrayRemove.'):
-                field_name = key[len('arrayRemove.'):]
-                if field_name in existing_data and isinstance(existing_data[field_name], list):
-                    if isinstance(val, list):
-                        existing_data[field_name] = [
-                            item for item in existing_data[field_name] if item not in val
-                        ]
-                    else:
-                        existing_data[field_name] = [
-                            item for item in existing_data[field_name] if item != val
-                        ]
-            elif key.startswith('increment.'):
-                field_name = key[len('increment.'):]
-                if field_name in existing_data and isinstance(existing_data[field_name], (int, float)):
-                    existing_data[field_name] += val
-                else:
-                    existing_data[field_name] = val
-            else:
-                existing_data[key] = val
+        # Preview transformations to check size without modifying the original document
+        updated_doc = preview_transformations(document, updates)
 
-        self._update_time = Timestamp.from_now()
-        return None
+        # Check document size after applying updates
+        doc_size = calculate_document_size(updated_doc)
+        if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
+            raise InvalidArgument(
+                f"Document exceeds maximum size of {FIRESTORE_DOCUMENT_SIZE_LIMIT} bytes after update. Current size: {doc_size} bytes."
+            )
+        
+        # Apply the update to the actual document only if size check passes
+        apply_transformations(document, updates)
 
     async def delete(self, option=None) -> None:
         """Delete the document.
@@ -265,33 +298,8 @@ class AsyncDocumentReference:
         except KeyError:
             pass
         return None
+        
 
-    def _recursive_update(self, original: Dict, update: Dict) -> None:
-        """Recursively update a nested dictionary."""
-        for key, val in update.items():
-            if isinstance(val, dict) and key in original and isinstance(original[key], dict):
-                self._recursive_update(original[key], val)
-            else:
-                original[key] = val
 
-    def _update_nested_field(self, data: Dict, key: str, value: Any) -> None:
-        """Update a nested field."""
-        parts = key.split('.')
-        current = data
-        for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            current = current[part]
-        current[parts[-1]] = value
-
-    def _delete_field(self, data: Dict, path: List[str]) -> None:
-        """Delete a field at the specified path."""
-        if not path:
-            return
-        if len(path) == 1:
-            if path[0] in data:
-                del data[path[0]]
-        else:
-            key, rest = path[0], path[1:]
-            if key in data and isinstance(data[key], dict):
-                self._delete_field(data[key], rest)
+    # These helper methods are no longer needed as we're using apply_transformations
+    # which already handles recursive updates, nested fields, and field deletions.
