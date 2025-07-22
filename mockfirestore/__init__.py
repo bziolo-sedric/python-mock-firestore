@@ -3,6 +3,7 @@
 # try to import gcloud exceptions
 # and if gcloud is not installed, define our own
 from google.api_core.exceptions import ClientError, Conflict, NotFound, AlreadyExists, InvalidArgument
+from google.cloud.firestore import DELETE_FIELD, Increment, ArrayUnion, ArrayRemove
 
 
 # Synchronous implementations
@@ -10,7 +11,7 @@ from mockfirestore.client import MockFirestore
 from mockfirestore.document import DocumentSnapshot, DocumentReference
 from mockfirestore.collection import CollectionReference, CollectionGroup
 from mockfirestore.query import Query, And, Or
-from mockfirestore._helpers import Timestamp, DELETE_FIELD
+from mockfirestore._helpers import Timestamp
 from mockfirestore.transaction import Transaction
 from mockfirestore.aggregation import AggregationQuery, AggregationResult
 
