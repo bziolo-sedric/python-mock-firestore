@@ -2,10 +2,8 @@
 # https://github.com/mongomock/mongomock/blob/develop/mongomock/__init__.py
 # try to import gcloud exceptions
 # and if gcloud is not installed, define our own
-try:
-    from google.api_core.exceptions import ClientError, Conflict, NotFound, AlreadyExists
-except ImportError:
-    from mockfirestore.exceptions import ClientError, Conflict, NotFound, AlreadyExists
+from google.api_core.exceptions import ClientError, Conflict, NotFound, AlreadyExists, InvalidArgument
+
 
 # Synchronous implementations
 from mockfirestore.client import MockFirestore
