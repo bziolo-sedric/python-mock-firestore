@@ -1,6 +1,30 @@
 from typing import Dict, Any, List
+from copy import deepcopy
 
 from mockfirestore._helpers import get_document_iterator, get_by_path, set_by_path, delete_by_path
+
+
+def preview_transformations(document: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Simulates transformations without modifying the original document.
+    Returns a new document showing what the result would be after applying transformations.
+    
+    Args:
+        document: The original document to transform
+        data: The update data with transformations
+        
+    Returns:
+        A new document representing the result after applying transformations
+    """
+    # Create deep copies to avoid modifying originals
+    document_copy = deepcopy(document)
+    data_copy = deepcopy(data)
+    
+    # Apply transformations to the copies
+    apply_transformations(document_copy, data_copy)
+    
+    # Return the transformed document copy
+    return document_copy
 
 
 def apply_transformations(document: Dict[str, Any], data: Dict[str, Any]):
