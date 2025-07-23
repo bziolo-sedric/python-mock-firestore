@@ -267,12 +267,12 @@ class AsyncDocumentReference:
         
         return WriteResult()
 
-    async def update(self, data: Dict[str, Any]) -> WriteResult:
+    async def update(self, field_updates: Dict[str, Any]) -> WriteResult:
         """Update document data.
         
         Args:
-            data: The document data to update.
-            
+            field_updates: The fields to update and their new values.
+
         Raises:
             NotFound: If the document does not exist.
             InvalidArgument: If the document exceeds the 1MB size limit.
@@ -287,7 +287,7 @@ class AsyncDocumentReference:
 
         document = get_by_path(self._data, self._path)
 
-        updates = copy.deepcopy(data)
+        updates = copy.deepcopy(field_updates)
 
         # Preview transformations to check size without modifying the original document
         updated_doc = preview_transformations(document, updates)
