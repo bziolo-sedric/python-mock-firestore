@@ -123,12 +123,12 @@ class DocumentReference:
 
         return WriteResult()
 
-    def update(self, data: Dict[str, Any]) -> WriteResult:
+    def update(self, field_updates: Dict[str, Any]) -> WriteResult:
         """Update an existing document.
         
         Args:
-            data: The document data to update.
-            
+            field_updates: The fields to update and their new values.
+
         Returns:
             WriteResult: The write result corresponding to the updated document.
         """
@@ -137,8 +137,8 @@ class DocumentReference:
             raise NotFound('No document to update: {}'.format(self._path))
             
         # Preview transformations to check size without modifying the original document
-        updated_doc = preview_transformations(document, deepcopy(data))
-        
+        updated_doc = preview_transformations(document, deepcopy(field_updates))
+
         # Check document size after applying updates
         doc_size = calculate_document_size(updated_doc)
         if doc_size > FIRESTORE_DOCUMENT_SIZE_LIMIT:
@@ -147,7 +147,7 @@ class DocumentReference:
             )
         
         # Apply the update to the actual document only if size check passes
-        apply_transformations(document, deepcopy(data))
+        apply_transformations(document, deepcopy(field_updates))
 
         return WriteResult()
 
