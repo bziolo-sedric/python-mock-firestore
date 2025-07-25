@@ -54,7 +54,7 @@ class MockFirestore:
     def collection_group(self, collection_id: str) -> "CollectionGroup":
         collection_id = collection_mark_path_element(collection_id)
 
-        return CollectionGroup(self._data, collection_id)
+        return CollectionGroup(CollectionReference(self._data, [collection_id]))
 
     def reset(self):
         self._data = {}

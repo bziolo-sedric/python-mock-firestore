@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union, Iterable, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional, Tuple, Union, Iterable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mockfirestore.async_.aggregation import AsyncAggregationQuery
@@ -46,9 +46,20 @@ class AsyncQuery:
         'not-in': lambda value, values: value not in values
     }
 
-    def __init__(self, parent, field_filters=(), orders=(), limit=None, 
-                 limit_to_last=False, offset=None, start_at=None, end_at=None,
-                 all_descendants=True, projection=None, recursive=False):
+    def __init__(
+        self, 
+        parent: 'AsyncCollectionReference',
+        projection=None,
+        field_filters: Tuple[Tuple[str, str, Any], ...]=(), 
+        orders: Tuple[Tuple[str, Union[Literal['DESCENDING'], Literal['ASCENDING']]], ...]=(), 
+        limit: Optional[int] = None, 
+        limit_to_last: Optional[int] = None, 
+        offset: Optional[int] = None,
+        start_at: Optional[Any] = None, 
+        end_at: Optional[Any] = None, 
+        all_descendants: bool = False,
+        recursive: bool = False
+    ):
         self._parent = parent
         self._field_filters = field_filters
         self._orders = orders
@@ -80,8 +91,8 @@ class AsyncQuery:
             start_at=self._start_at,
             end_at=self._end_at,
             all_descendants=self._all_descendants,
-            projection=self._projection,
-            recursive=self._recursive
+            recursive=self._recursive,
+            projection=self._projection
         )
         args.update(kwargs)
         return AsyncQuery(**args)
@@ -265,16 +276,17 @@ class AsyncQuery:
         Returns:
             An asynchronous iterator of AsyncDocumentSnapshot objects.
         """
-        from mockfirestore.async_.document import AsyncDocumentSnapshot
+        from mockfirestore.async_ import AsyncDocumentSnapshot, AsyncCollectionReference
         
-        collection_data = get_by_path(self._parent._data, self._parent._path)
+        collections: List[AsyncCollectionReference] = self._find_collections()
+        doc_snapshots: AsyncIterator[AsyncDocumentSnapshot] = self._amerge(*[collection.stream(transaction=transaction) for collection in collections])
         
         # Apply filters
-        filtered_data = {}
-        for doc_id, doc_data in collection_data.items():
-            if self._passes_filters(doc_data):
-                filtered_data[doc_id] = doc_data
-        
+        filtered_data: Dict[str, AsyncDocumentSnapshot] = {}
+        async for doc_snapshot in doc_snapshots:
+            if self._passes_filters(doc_snapshot.to_dict()):
+                filtered_data[doc_snapshot.id] = doc_snapshot
+
         # Apply ordering
         ordered_doc_ids = self._apply_ordering(filtered_data)
         
@@ -286,9 +298,15 @@ class AsyncQuery:
         
         # Yield snapshots one by one
         for doc_id in ordered_doc_ids:
-            doc_ref = self._parent.document(doc_id)
-            doc_snapshot = await doc_ref.get()
-            yield doc_snapshot
+            yield filtered_data[doc_id]
+
+    async def _amerge(self, *iterators) -> AsyncIterator[Any]:
+        for iterator in iterators:
+            async for item in iterator:
+                yield item
+
+    def _find_collections(self) -> List['AsyncCollectionReference']:
+        return [self._parent]
 
     def _passes_filters(self, doc_data):
         """Check if a document passes all filters.

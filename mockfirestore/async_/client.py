@@ -1,6 +1,5 @@
-from typing import Iterable, Sequence, List, Optional, Union
-import asyncio
-from mockfirestore._helpers import collection_mark_path, collection_mark_path_element, generate_random_string, Store, get_by_path, set_by_path
+from typing import Iterable, Sequence, List
+from mockfirestore._helpers import collection_mark_path, collection_mark_path_element, set_by_path
 from mockfirestore.async_.collection import AsyncCollectionReference, AsyncCollectionGroup
 from mockfirestore.async_.document import AsyncDocumentReference, AsyncDocumentSnapshot
 from mockfirestore.async_.transaction import AsyncTransaction, AsyncBatch
@@ -94,7 +93,7 @@ class AsyncMockFirestore:
         """
         collection_id = collection_mark_path_element(collection_id)
 
-        return AsyncCollectionGroup(self._data, collection_id)
+        return AsyncCollectionGroup(AsyncCollectionReference(self._data, [collection_id]))
 
     def reset(self):
         """Reset the mock firestore data."""
