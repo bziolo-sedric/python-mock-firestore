@@ -1,6 +1,7 @@
+import itertools
 import warnings
 from itertools import islice, tee
-from typing import Iterable, Iterator, Any, Optional, List, Callable, Union, TYPE_CHECKING
+from typing import Iterable, Iterator, Any, Literal, Optional, List, Callable, Tuple, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mockfirestore.aggregation import AggregationQuery
@@ -32,14 +33,25 @@ class And(CompositeFilter):
 
 
 class Query:
-    def __init__(self, parent: 'CollectionReference', projection=None,
-                 field_filters=(), orders=(), limit=None, offset=None,
-                 start_at=None, end_at=None, all_descendants=False) -> None:
-        self.parent = parent
+    def __init__(
+        self, 
+        parent: 'CollectionReference',
+        projection=None,
+        field_filters: Tuple[Tuple[str, str, Any], ...]=(), 
+        orders: Tuple[Tuple[str, Union[Literal['DESCENDING'], Literal['ASCENDING']]], ...]=(), 
+        limit: Optional[int] = None, 
+        limit_to_last: Optional[int] = None, 
+        offset: Optional[int] = None,
+        start_at: Optional[Any] = None, 
+        end_at: Optional[Any] = None, 
+        all_descendants: bool = False
+    ) -> None:
+        self._parent = parent
         self.projection = projection
         self._field_filters = []
         self.orders = list(orders)
         self._limit = limit
+        self._limit_to_last = limit_to_last
         self._offset = offset
         self._start_at = start_at
         self._end_at = end_at
@@ -49,10 +61,13 @@ class Query:
             for field_filter in field_filters:
                 self._add_field_filter(*field_filter)
 
+    def _find_collections(self) -> List['CollectionReference']:
+        return [self._parent]
+
     def stream(self, transaction=None):
-        from mockfirestore import CollectionReference, CollectionGroup, DocumentSnapshot
-        parent: Union[CollectionReference, CollectionGroup] = self.parent
-        doc_snapshots: Iterator[DocumentSnapshot] = parent.stream(transaction=transaction)
+        from mockfirestore import CollectionReference, DocumentSnapshot
+        collections: List[CollectionReference] = self._find_collections()
+        doc_snapshots: Iterator[DocumentSnapshot] = itertools.chain.from_iterable([collection.stream(transaction=transaction) for collection in collections])
 
         for field, compare, value in self._field_filters:
             filtered_snapshots = []
@@ -132,7 +147,7 @@ class Query:
         compare = self._compare_func(op)
         self._field_filters.append((field, compare, value))
 
-    def where(self, field: Optional[str] = None, op: Optional[str] = None, value: Any = None, filter=None) -> 'PatchedQuery':
+    def where(self, field: Optional[str] = None, op: Optional[str] = None, value: Any = None, filter=None) -> 'Query':
         field, op, value = self.make_field_filter(field, op, value, filter)
         self._add_field_filter(field, op, value)
         return self
@@ -144,8 +159,10 @@ class Query:
                 "Can't pass in both the positional arguments and 'filter' at the same time")
         if filter:
             if hasattr(filter, 'filters'):
-                filters = [Query.make_field_filter(
-                    None, None, None, f) for f in filter.filters]
+                filters = [
+                    Query.make_field_filter(None, None, None, f) 
+                    for f in filter.filters
+                ]
                 return (filter.__class__.__name__, filter.__class__.__name__, filters)
 
             return (filter.field_path, filter.op_string, filter.value)
@@ -203,7 +220,7 @@ class Query:
         Args:
             field_ref: The field to aggregate across.
             alias: Optional name of the field to store the result.
-            
+
         Returns:
             An AggregationQuery with the average aggregation.
         """
@@ -223,8 +240,13 @@ class Query:
         from mockfirestore.aggregation import AggregationQuery
         return AggregationQuery(self, alias).sum(field_ref, alias)
 
-    def _apply_cursor(self, document_fields_or_snapshot: Union[dict, DocumentSnapshot], doc_snapshot: Iterator[DocumentSnapshot],
-                      before: bool, start: bool) -> Iterator[DocumentSnapshot]:
+    def _apply_cursor(
+        self, 
+        document_fields_or_snapshot: Union[dict, DocumentSnapshot], 
+        doc_snapshot: Iterator[DocumentSnapshot],
+        before: bool, 
+        start: bool
+    ) -> Iterator[DocumentSnapshot]:
         docs, doc_snapshot = tee(doc_snapshot)
         for idx, doc in enumerate(doc_snapshot):
             index = None
