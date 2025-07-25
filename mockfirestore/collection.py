@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Callable, Iterator, List, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
+from typing import Any, Callable, Iterator, List, Literal, Optional, Iterable, Dict, Tuple, Sequence, Union, TYPE_CHECKING
 
 from mockfirestore import AlreadyExists
 from mockfirestore._helpers import PATH_ELEMENT_SEPARATOR, generate_random_string, Store, get_by_path, is_path_element_collection_marked, set_by_path, Timestamp, traverse_dict
@@ -129,34 +129,69 @@ class CollectionReference:
             doc_snapshot = self.document(key).get(transaction=transaction)
             yield doc_snapshot
 
-class CollectionGroup:
+class CollectionGroup(Query):
     def __init__(
         self,
-        data: Store,
-        collection_id: str,
+        parent: CollectionReference,
         projection=None,
-        field_filters=(),
-        orders=(),
-        limit=None,
-        limit_to_last=False,
-        offset=None,
-        start_at=None,
-        end_at=None,
-        all_descendants=True,
-        recursive=False,
+        field_filters: Tuple[Tuple[str, str, Any], ...] = tuple(), 
+        orders: Tuple[Tuple[str, Union[Literal['DESCENDING'], Literal['ASCENDING']]], ...] = tuple(), 
+        limit: Optional[int] = None, 
+        limit_to_last: Optional[int] = None, 
+        offset: Optional[int] = None,
+        start_at: Optional[Any] = None, 
+        end_at: Optional[Any] = None, 
+        all_descendants: bool = False,
+        recursive: bool = False
     ):
-        self._data = data
-        self._collection_id = collection_id
-        self._projection = projection
-        self._field_filters = field_filters
-        self._orders = orders
-        self._limit = limit
-        self._limit_to_last = limit_to_last
-        self._offset = offset
-        self._start_at = start_at
-        self._end_at = end_at
-        self._all_descendants = all_descendants
+        super().__init__(
+            parent=parent,
+            projection=projection,
+            field_filters=field_filters,
+            orders=orders,
+            limit=limit,
+            limit_to_last=limit_to_last,
+            offset=offset,
+            start_at=start_at,
+            end_at=end_at,
+            all_descendants=all_descendants
+        )
+
         self._recursive = recursive
+
+    def _copy(self, **kwargs):
+        """Create a copy of this query with the specified changes.
+        
+        Args:
+            **kwargs: The changes to apply to the query.
+            
+        Returns:
+            A new AsyncQuery with the changes applied.
+        """
+        args = dict(
+            parent=self._parent,
+            field_filters=self._field_filters,
+            orders=self.orders,
+            limit=self._limit,
+            limit_to_last=self._limit_to_last,
+            offset=self._offset,
+            start_at=self._start_at,
+            end_at=self._end_at,
+            all_descendants=self.all_descendants,
+            projection=self._projection,
+            recursive=self._recursive
+        )
+        args.update(kwargs)
+        return CollectionGroup(**args)
+
+    def _get_collection_id(self) -> str:
+        """Get the collection ID from the parent path."""
+        parent: CollectionReference = self._parent
+
+        if not parent._path:
+            raise ValueError("CollectionGroup must have a parent with a valid path.")
+
+        return parent._path[-1]
 
     def _find_collections(self) -> List[CollectionReference]:
         """
@@ -165,110 +200,23 @@ class CollectionGroup:
         """
         collections: List[CollectionReference] = []
 
+        parent: CollectionReference = self._parent
+
         def append_collection(key: str, current_path: str, collection_dict: Dict[str, Any]):
             if not is_path_element_collection_marked(key):
                 return
 
-            collections.append(CollectionReference(self._data, current_path.split(PATH_ELEMENT_SEPARATOR)))
+            collections.append(CollectionReference(parent._data, current_path.split(PATH_ELEMENT_SEPARATOR)))
 
-        traverse_dict(self._data, append_collection)
+        traverse_dict(parent._data, append_collection)
 
         relevant_collections = [
             collection for collection in collections
-            if collection._path[-1] == self._collection_id
+            if collection._path[-1] == self._get_collection_id()
+            and collection != self._parent  # Exclude the parent collection itself
         ]
 
         return relevant_collections
-
-    def _copy(self, **kwargs):
-        args = dict(
-            data=self._data,
-            collection_id=self._collection_id,
-            projection=self._projection,
-            field_filters=self._field_filters,
-            orders=self._orders,
-            limit=self._limit,
-            limit_to_last=self._limit_to_last,
-            offset=self._offset,
-            start_at=self._start_at,
-            end_at=self._end_at,
-            all_descendants=self._all_descendants,
-            recursive=self._recursive,
-        )
-        args.update(kwargs)
-        return CollectionGroup(**args)
-
-    # ---- Query/Chaining methods ----
-    def where(self, field=None, op=None, value=None, filter=None):
-        new_filters = self._field_filters + (Query.make_field_filter(field, op, value, filter),)
-        return self._copy(field_filters=new_filters)
-
-    def order_by(self, field_path: str, direction: Optional[str] = None):
-        new_orders = self._orders + ((field_path, direction),)
-        return self._copy(orders=new_orders)
-
-    def limit(self, count: int):
-        return self._copy(limit=count)
-
-    def limit_to_last(self, count: int):
-        return self._copy(limit=count, limit_to_last=True)
-
-    def offset(self, num_to_skip: int):
-        return self._copy(offset=num_to_skip)
-
-    def start_at(self, document_fields_or_snapshot):
-        return self._copy(start_at=(document_fields_or_snapshot, True))
-
-    def start_after(self, document_fields_or_snapshot):
-        return self._copy(start_at=(document_fields_or_snapshot, False))
-
-    def end_at(self, document_fields_or_snapshot):
-        return self._copy(end_at=(document_fields_or_snapshot, True))
-
-    def end_before(self, document_fields_or_snapshot):
-        return self._copy(end_at=(document_fields_or_snapshot, False))
-    
-    def select(self, field_paths: Iterable[str]):
-        return self._copy(projection=field_paths)
-
-    # ---- Aggregations ----
-    def count(self, alias=None):
-        """Adds a count over the collection group.
-        
-        Args:
-            alias: Optional name of the field to store the result.
-            
-        Returns:
-            An AggregationQuery with the count aggregation.
-        """
-        from mockfirestore.aggregation import AggregationQuery
-        return AggregationQuery(self, alias).count(alias)
-
-    def avg(self, field_ref, alias=None):
-        """Adds an average over the collection group.
-        
-        Args:
-            field_ref: The field to aggregate across.
-            alias: Optional name of the field to store the result.
-            
-        Returns:
-            An AggregationQuery with the average aggregation.
-        """
-        from mockfirestore.aggregation import AggregationQuery
-        return AggregationQuery(self, alias).avg(field_ref, alias)
-
-    def sum(self, field_ref, alias=None):
-        """Adds a sum over the collection group.
-        
-        Args:
-            field_ref: The field to aggregate across.
-            alias: Optional name of the field to store the result.
-            
-        Returns:
-            An AggregationQuery with the sum aggregation.
-        """
-        from mockfirestore.aggregation import AggregationQuery
-        return AggregationQuery(self, alias).sum(field_ref, alias)
 
     def find_nearest(
         self,
@@ -282,24 +230,8 @@ class CollectionGroup:
     ):
         return self
 
-    # ---- Streaming/get ----
-    def stream(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> Iterator[DocumentSnapshot]:
-        for doc in self._iter_documents():
-            yield doc.get(transaction=transaction, retry=retry, timeout=timeout)
-
-    def get(self, transaction=None, retry=None, timeout=None, *, explain_options=None) -> List[DocumentSnapshot]:
-        return list(self.stream(transaction=transaction, retry=retry, timeout=timeout, explain_options=explain_options))
-
-    def list_documents(self, page_size: Optional[int] = None) -> Iterator[DocumentReference]:
-        yield from self._iter_documents()
-
     def on_snapshot(self, callback: Callable) -> None:
         raise NotImplementedError("on_snapshot is not supported in mock.")
 
-    # ---- Internal: yield DocumentSnapshot objects, filtered ----
-    def _iter_documents(self) -> Iterator[DocumentReference]:
-        for collection_reference in self._find_collections():
-            yield from collection_reference.list_documents()
-
     def __repr__(self):
-        return f"<CollectionGroup '{self._collection_id}'>"
+        return f"<CollectionGroup '{self._get_collection_id()}'>"
