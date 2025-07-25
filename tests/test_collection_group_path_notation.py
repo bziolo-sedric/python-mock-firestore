@@ -162,3 +162,34 @@ class TestCollectionGroupPathNotation(unittest.TestCase):
         
         # Now should find 5 reviews
         self.assertEqual(len(results), 5)
+        
+    def test_parent_collection_not_included_in_collection_group(self):
+        """
+        Test to verify that the parent collection used to create the CollectionGroup
+        is included in the results if it matches the collection ID.
+        """
+        # Create a top-level collection with the same name we'll query
+        self.mock_db.collection('standalone_reviews').document('review_standalone').set({
+            'user': 'User Standalone',
+            'rating': 3,
+            'comment': 'Standalone review'
+        })
+        
+        # Create another document in a nested collection with the same name
+        self.mock_db.collection('products').document('product3').collection('standalone_reviews').document('review_nested').set({
+            'user': 'User Nested',
+            'rating': 4,
+            'comment': 'Nested review'
+        })
+        
+        # Get collection group for 'standalone_reviews'
+        reviews = self.mock_db.collection_group('standalone_reviews')
+        results = reviews.get()
+        
+        # Should find both reviews (parent and nested)
+        self.assertEqual(len(results), 2)
+        
+        # Check if both documents are included
+        users = set(doc.to_dict().get('user') for doc in results)
+        self.assertIn('User Standalone', users)  # From parent collection
+        self.assertIn('User Nested', users)      # From nested collection
