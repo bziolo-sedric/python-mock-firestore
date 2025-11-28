@@ -289,6 +289,8 @@ class Query:
             return lambda x, y: x is not None and x >= y
         elif op == 'in':
             return lambda x, y: x in y
+        elif op == 'not-in':
+            return lambda x, y: x not in y
         elif op == 'array_contains':
             return lambda x, y: y in x
         elif op == 'array_contains_any':
