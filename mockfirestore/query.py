@@ -276,13 +276,17 @@ class Query:
         elif op == '!=':
             return lambda x, y: x != y
         elif op == '<':
-            return lambda x, y: x < y
+            # Firestore behavior: exclude None/missing fields from comparison queries
+            return lambda x, y: x is not None and x < y
         elif op == '<=':
-            return lambda x, y: x <= y
+            # Firestore behavior: exclude None/missing fields from comparison queries
+            return lambda x, y: x is not None and x <= y
         elif op == '>':
-            return lambda x, y: x > y
+            # Firestore behavior: exclude None/missing fields from comparison queries
+            return lambda x, y: x is not None and x > y
         elif op == '>=':
-            return lambda x, y: x >= y
+            # Firestore behavior: exclude None/missing fields from comparison queries
+            return lambda x, y: x is not None and x >= y
         elif op == 'in':
             return lambda x, y: x in y
         elif op == 'array_contains':
