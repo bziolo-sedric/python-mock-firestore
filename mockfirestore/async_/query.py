@@ -46,11 +46,12 @@ class AsyncQuery:
 
     # Comparison operators for filtering
     OPERATORS = {
-        '<': operator.lt,
-        '<=': operator.le,
+        # Firestore behavior: exclude None/missing fields from comparison queries
+        '<': lambda x, y: x is not None and x < y,
+        '<=': lambda x, y: x is not None and x <= y,
         '==': operator.eq,
-        '>=': operator.ge,
-        '>': operator.gt,
+        '>=': lambda x, y: x is not None and x >= y,
+        '>': lambda x, y: x is not None and x > y,
         '!=': operator.ne,
         'array_contains': lambda array, value: value in array if isinstance(array, list) else False,
         'array_contains_any': lambda array, values: any(value in array for value in values) if isinstance(array, list) else False,
@@ -296,18 +297,29 @@ class AsyncQuery:
         # Apply filters
         filtered_data: Dict[str, AsyncDocumentSnapshot] = {}
         async for doc_snapshot in doc_snapshots:
-            if self._passes_filters(doc_snapshot.to_dict()):
+            if self._passes_filters(doc_snapshot):
                 filtered_data[doc_snapshot.id] = doc_snapshot
 
         # Apply ordering
         ordered_doc_ids = self._apply_ordering(filtered_data)
-        
+
+        # Apply cursor filters
+        if self._start_at:
+            document_fields_or_snapshot, before = self._start_at
+            ordered_doc_ids = self._apply_cursor(
+                document_fields_or_snapshot, ordered_doc_ids, filtered_data, before, True)
+
+        if self._end_at:
+            document_fields_or_snapshot, before = self._end_at
+            ordered_doc_ids = self._apply_cursor(
+                document_fields_or_snapshot, ordered_doc_ids, filtered_data, before, False)
+
         # Apply pagination (offset & limit)
         if self._offset:
             ordered_doc_ids = ordered_doc_ids[self._offset:]
         if self._limit:
             ordered_doc_ids = ordered_doc_ids[:self._limit]
-        
+
         # Yield snapshots one by one
         for doc_id in ordered_doc_ids:
             yield filtered_data[doc_id]
@@ -320,39 +332,48 @@ class AsyncQuery:
     def _find_collections(self) -> List['AsyncCollectionReference']:
         return [self._parent]
 
-    def _passes_filters(self, doc_data):
+    def _passes_filters(self, doc_snapshot):
         """Check if a document passes all filters.
-        
+
         Args:
-            doc_data: The document data.
-            
+            doc_snapshot: The document snapshot (not just data).
+
         Returns:
             True if the document passes all filters, False otherwise.
         """
         for field_filter in self._field_filters:
             if isinstance(field_filter, And):
-                if not all(self._passes_single_filter(doc_data, f) for f in field_filter.filters):
+                if not all(self._passes_single_filter(doc_snapshot, f) for f in field_filter.filters):
                     return False
             elif isinstance(field_filter, Or):
-                if not any(self._passes_single_filter(doc_data, f) for f in field_filter.filters):
+                if not any(self._passes_single_filter(doc_snapshot, f) for f in field_filter.filters):
                     return False
             else:
-                if not self._passes_single_filter(doc_data, field_filter):
+                if not self._passes_single_filter(doc_snapshot, field_filter):
                     return False
         return True
 
-    def _passes_single_filter(self, doc_data, field_filter):
+    def _passes_single_filter(self, doc_snapshot, field_filter):
         """Check if a document passes a single filter.
-        
+
         Args:
-            doc_data: The document data.
+            doc_snapshot: The document snapshot.
             field_filter: The filter to check against.
-            
+
         Returns:
             True if the document passes the filter, False otherwise.
         """
         field, op, value = field_filter
-        
+
+        # Handle fieldpath.documentId() - special field __name__
+        if field == '__name__':
+            op_func = self.OPERATORS.get(op)
+            if op_func is None:
+                return False
+            return op_func(doc_snapshot.id, value)
+
+        doc_data = doc_snapshot.to_dict()
+
         if '.' in field:  # Handle nested fields
             parts = field.split('.')
             current = doc_data
@@ -368,41 +389,41 @@ class AsyncQuery:
             if field not in doc_data:
                 return False
             doc_value = doc_data[field]
-            
+
         # Handle special cases for array operations
         if op in ('array_contains', 'array_contains_any'):
             if not isinstance(doc_value, list):
                 return False
-                
+
         # Get the operator function and apply it
         op_func = self.OPERATORS.get(op)
         if op_func is None:
             return False
-            
+
         return op_func(doc_value, value)
 
     def _apply_ordering(self, filtered_data):
         """Apply ordering to filtered data.
-        
+
         Args:
             filtered_data: The filtered document data.
-            
+
         Returns:
             A list of document IDs in the ordered sequence.
         """
         if not self._orders:
             return sorted(filtered_data.keys())
-            
+
         items = list(filtered_data.items())
-        
+
         # Apply each order sequentially
         for key, direction in reversed(self._orders):
             reverse = direction == 'DESCENDING'
-            
+
             # Handle nested fields
             if '.' in key:
                 parts = key.split('.')
-                
+
                 def get_value(item):
                     doc_id, doc_data = item
                     current = doc_data
@@ -415,10 +436,54 @@ class AsyncQuery:
                 def get_value(item):
                     doc_id, doc_data = item
                     return doc_data.get(key)
-                    
+
             items.sort(key=get_value, reverse=reverse)
-            
+
         return [doc_id for doc_id, _ in items]
+
+    def _apply_cursor(self, document_fields_or_snapshot, ordered_doc_ids, filtered_data, before, start):
+        """Apply cursor filtering to ordered document IDs.
+
+        Args:
+            document_fields_or_snapshot: A dictionary of field values or a document snapshot.
+            ordered_doc_ids: The ordered list of document IDs.
+            filtered_data: The filtered document data dict.
+            before: If True, include the cursor document; otherwise exclude it.
+            start: If True, this is a start cursor; otherwise it's an end cursor.
+
+        Returns:
+            A filtered list of document IDs respecting the cursor.
+        """
+        from mockfirestore.async_ import AsyncDocumentSnapshot
+
+        for idx, doc_id in enumerate(ordered_doc_ids):
+            index = None
+            doc_snapshot = filtered_data[doc_id]
+
+            if isinstance(document_fields_or_snapshot, dict):
+                # Match all fields in the cursor
+                match = True
+                for k, v in document_fields_or_snapshot.items():
+                    if doc_snapshot.to_dict().get(k, None) != v:
+                        match = False
+                        break
+                if match:
+                    index = idx
+            elif isinstance(document_fields_or_snapshot, AsyncDocumentSnapshot):
+                if doc_snapshot.id == document_fields_or_snapshot.id:
+                    index = idx
+
+            if index is not None:
+                if before and start:
+                    return ordered_doc_ids[index:]
+                elif not before and start:
+                    return ordered_doc_ids[index + 1:]
+                elif before and not start:
+                    return ordered_doc_ids[:index + 1]
+                elif not before and not start:
+                    return ordered_doc_ids[:index]
+
+        return ordered_doc_ids
 
 
 class Filter:
