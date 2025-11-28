@@ -96,7 +96,7 @@ class AsyncCollectionReference:
         Returns:
             An AsyncQuery with the filter applied.
         """
-        query = AsyncQuery(self, field_filters=[AsyncQuery.make_field_filter(field, op, value, filter)])
+        query = AsyncQuery(self, field_filters=(AsyncQuery.make_field_filter(field, op, value, filter),))
         return query
 
     def order_by(self, field_path: str, direction: Optional[str] = None) -> AsyncQuery:
