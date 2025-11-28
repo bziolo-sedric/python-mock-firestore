@@ -3,7 +3,7 @@ import copy
 from datetime import datetime
 from mockfirestore._helpers import (
     Store, collection_mark_path_element, get_by_path, set_by_path, Timestamp,
-    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size, convert_to_datetime_with_nanoseconds
 )
 from mockfirestore import NotFound as NotFoundError, InvalidArgument
 from mockfirestore._transformations import preview_transformations, apply_transformations
@@ -95,7 +95,9 @@ class AsyncDocumentSnapshot:
         Returns:
             The document as a dictionary or None if the document doesn't exist.
         """
-        return self._data.copy() if self._data else None
+        if self._data:
+            return convert_to_datetime_with_nanoseconds(self._data.copy())
+        return None
 
 
 class AsyncDocumentReference:
