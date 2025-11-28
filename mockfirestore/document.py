@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional, Iterable
 from mockfirestore import NotFound, InvalidArgument
 from mockfirestore._helpers import (
     Timestamp, Document, Store, collection_mark_path_element, get_by_path, set_by_path, delete_by_path,
-    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size
+    FIRESTORE_DOCUMENT_SIZE_LIMIT, calculate_document_size, convert_to_datetime_with_nanoseconds
 )
 from mockfirestore._transformations import apply_transformations, preview_transformations
 from mockfirestore.write_result import WriteResult
@@ -25,7 +25,7 @@ class DocumentSnapshot:
         return self._doc != {}
 
     def to_dict(self) -> Document:
-        return self._doc
+        return convert_to_datetime_with_nanoseconds(self._doc)
 
     @property
     def create_time(self) -> Timestamp:

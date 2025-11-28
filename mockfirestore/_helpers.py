@@ -151,6 +151,101 @@ def calculate_document_size(document_data: Dict[str, Any]) -> int:
     return _estimate(document_data, skip_collections=True)
 
 
+class DatetimeWithNanoseconds(dt):
+    """
+    Mock implementation of google.api_core.datetime_helpers.DatetimeWithNanoseconds
+
+    This is a datetime subclass that tracks nanosecond precision in addition to the
+    standard datetime microsecond precision. This class mimics the behavior of the
+    real DatetimeWithNanoseconds from google.api_core.datetime_helpers.
+
+    NOTE: This is a mock implementation to match Firestore's behavior without
+    requiring the google-cloud-firestore dependency. It is NOT the real
+    DatetimeWithNanoseconds class.
+
+    Attributes:
+        nanosecond (int): The nanosecond component (0-999999999)
+    """
+
+    __slots__ = ('_nanosecond',)
+
+    def __new__(cls, *args, **kwargs):
+        """Create a new DatetimeWithNanoseconds instance.
+
+        Args:
+            *args: Standard datetime arguments (year, month, day, etc.)
+            **kwargs: Standard datetime keyword arguments, plus 'nanosecond'
+
+        The 'nanosecond' kwarg can only be passed as a keyword argument.
+        """
+        # Extract nanosecond before passing to datetime
+        nanosecond = kwargs.pop('nanosecond', None)
+
+        # Create the datetime instance
+        instance = super().__new__(cls, *args, **kwargs)
+
+        # Set the nanosecond value
+        if nanosecond is not None:
+            if not isinstance(nanosecond, int):
+                raise TypeError('nanosecond must be an integer')
+            if not 0 <= nanosecond <= 999999999:
+                raise ValueError('nanosecond must be in 0..999999999')
+            object.__setattr__(instance, '_nanosecond', nanosecond)
+        else:
+            # Calculate from microsecond if not provided
+            object.__setattr__(instance, '_nanosecond', instance.microsecond * 1000)
+
+        return instance
+
+    @property
+    def nanosecond(self):
+        """int: The nanosecond component (0-999999999)"""
+        return self._nanosecond
+
+    def __repr__(self):
+        """Return a string representation matching the real DatetimeWithNanoseconds."""
+        base_repr = super().__repr__()
+        # Insert nanosecond info before the closing parenthesis
+        if base_repr.startswith('datetime.datetime('):
+            base_repr = 'DatetimeWithNanoseconds(' + base_repr[18:]
+        # Add nanosecond if it differs from what microsecond would give
+        if self._nanosecond != self.microsecond * 1000:
+            base_repr = base_repr[:-1] + f', nanosecond={self._nanosecond})'
+        return base_repr
+
+    def __reduce__(self):
+        """Support for pickling and copying."""
+        return (
+            _restore_datetime_with_nanoseconds,
+            (self.year, self.month, self.day, self.hour, self.minute,
+             self.second, self.microsecond, self.tzinfo, self._nanosecond)
+        )
+
+    def __deepcopy__(self, memo):
+        """Support for deep copying."""
+        return DatetimeWithNanoseconds(
+            self.year, self.month, self.day, self.hour, self.minute,
+            self.second, self.microsecond, self.tzinfo,
+            nanosecond=self._nanosecond
+        )
+
+    def __copy__(self):
+        """Support for shallow copying."""
+        return DatetimeWithNanoseconds(
+            self.year, self.month, self.day, self.hour, self.minute,
+            self.second, self.microsecond, self.tzinfo,
+            nanosecond=self._nanosecond
+        )
+
+
+def _restore_datetime_with_nanoseconds(year, month, day, hour, minute, second, microsecond, tzinfo, nanosecond):
+    """Helper function to restore DatetimeWithNanoseconds during unpickling."""
+    return DatetimeWithNanoseconds(
+        year, month, day, hour, minute, second, microsecond, tzinfo,
+        nanosecond=nanosecond
+    )
+
+
 class Timestamp:
     """
     Imitates some properties of `google.protobuf.timestamp_pb2.Timestamp`
@@ -171,6 +266,46 @@ class Timestamp:
     @property
     def nanos(self):
         return str(self._timestamp).split('.')[1]
+
+
+def convert_to_datetime_with_nanoseconds(value: Any) -> Any:
+    """
+    Recursively convert datetime objects to DatetimeWithNanoseconds.
+
+    This mimics Firestore's behavior of returning DatetimeWithNanoseconds
+    when retrieving datetime values from documents.
+
+    Args:
+        value: The value to convert (can be dict, list, datetime, or any other type)
+
+    Returns:
+        The value with datetime objects converted to DatetimeWithNanoseconds
+    """
+    if isinstance(value, DatetimeWithNanoseconds):
+        # Already converted, return as-is
+        return value
+    elif isinstance(value, dt):
+        # Convert regular datetime to DatetimeWithNanoseconds
+        # Calculate nanoseconds from microseconds (microseconds * 1000)
+        nanosecond = value.microsecond * 1000
+        return DatetimeWithNanoseconds(
+            value.year, value.month, value.day,
+            value.hour, value.minute, value.second,
+            value.microsecond, value.tzinfo,
+            nanosecond=nanosecond
+        )
+    elif isinstance(value, dict):
+        # Recursively convert dict values
+        return {k: convert_to_datetime_with_nanoseconds(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        # Recursively convert list items
+        return [convert_to_datetime_with_nanoseconds(item) for item in value]
+    elif isinstance(value, tuple):
+        # Recursively convert tuple items
+        return tuple(convert_to_datetime_with_nanoseconds(item) for item in value)
+    else:
+        # Return other types as-is
+        return value
 
 
 def get_document_iterator(document: Dict[str, Any], prefix: str = '') -> Iterator[Tuple[str, Any]]:
