@@ -151,42 +151,70 @@ class AggregationQuery:
         return AggregationResult(results)
 
 
+class AggregationResultItem:
+    """Represents a single aggregation result with alias and value."""
+
+    def __init__(self, alias: str, value: Any):
+        self.alias = alias
+        self.value = value
+
+    def __repr__(self):
+        return f"AggregationResultItem(alias={self.alias!r}, value={self.value!r})"
+
+
 class AggregationResult:
-    """Result of an aggregation query."""
-    
+    """Result of an aggregation query.
+
+    Mimics the real Firestore AggregationResult API which returns an iterable
+    where result[0] gives you an object with .alias and .value attributes.
+    """
+
     def __init__(self, data):
         """Initialize the aggregation result.
-        
+
         Args:
-            data: Dictionary of aggregation results.
+            data: Dictionary of aggregation results (alias -> value).
         """
         self._data = data
-    
+        # Convert dict to list of AggregationResultItem for real Firestore API compatibility
+        self._items = [[AggregationResultItem(alias, value)] for alias, value in data.items()]
+
     def __getitem__(self, key):
-        """Get a specific aggregation result by key.
-        
+        """Get aggregation result by index (for real Firestore API compatibility).
+
         Args:
-            key: The aggregation alias.
-            
+            key: The index (0-based).
+
         Returns:
-            The aggregation value.
+            A list containing AggregationResultItem objects.
         """
+        if isinstance(key, int):
+            return self._items[key]
+        # Also support string key for backwards compatibility
         return self._data.get(key)
-    
+
+    def __iter__(self):
+        """Iterate over aggregation results (for real Firestore API compatibility).
+
+        Returns:
+            Iterator over lists of AggregationResultItem objects.
+        """
+        return iter(self._items)
+
     def __contains__(self, key):
         """Check if an aggregation alias exists.
-        
+
         Args:
             key: The aggregation alias.
-            
+
         Returns:
             True if the alias exists.
         """
         return key in self._data
-    
+
     def to_dict(self):
         """Get all aggregation results as a dictionary.
-        
+
         Returns:
             Dictionary of all aggregation results.
         """
