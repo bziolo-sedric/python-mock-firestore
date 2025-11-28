@@ -18,18 +18,30 @@ class AsyncQuery:
     @classmethod
     def make_field_filter(cls, field=None, op=None, value=None, filter=None):
         """Create a field filter.
-        
+
         Args:
             field: The field to filter on.
             op: The operator to filter with.
             value: The value to compare against.
-            filter: A composite filter for complex queries.
-            
+            filter: A composite filter or FieldFilter object for complex queries.
+
         Returns:
-            A field filter.
+            A field filter tuple (field, op, value).
         """
         if filter is not None:
-            return filter
+            # Check if it's a composite filter (And/Or)
+            if hasattr(filter, 'filters'):
+                # Return the composite filter as-is for handling in _passes_filters
+                return filter
+            # Handle FieldFilter object (from google.cloud.firestore_v1)
+            elif hasattr(filter, 'field_path') and hasattr(filter, 'op_string') and hasattr(filter, 'value'):
+                return (filter.field_path, filter.op_string, filter.value)
+            # If it's already a tuple, return as-is
+            elif isinstance(filter, tuple):
+                return filter
+            # Unknown filter type, return as-is and let it fail later with a better error
+            else:
+                return filter
         return (field, op, value)
 
     # Comparison operators for filtering
