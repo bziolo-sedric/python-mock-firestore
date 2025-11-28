@@ -11,7 +11,7 @@ from mockfirestore.client import MockFirestore
 from mockfirestore.document import DocumentSnapshot, DocumentReference
 from mockfirestore.collection import CollectionReference, CollectionGroup
 from mockfirestore.query import Query, And, Or
-from mockfirestore._helpers import Timestamp
+from mockfirestore._helpers import Timestamp, DatetimeWithNanoseconds
 from mockfirestore.transaction import Transaction
 from mockfirestore.aggregation import AggregationQuery, AggregationResult
 
